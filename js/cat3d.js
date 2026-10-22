@@ -1,7 +1,7 @@
 // 코드로 만든 프로시저럴 툰 고양이 (구·캡슐·튜브 조합 + 인버티드 헐 외곽선)
 import * as THREE from 'three';
 import { resolveAppearance, FANTASY_PALETTE, mix } from './appearance.js';
-import { partTextures, eyeTexture, furAlpha } from './textures.js';
+import { partTextures, releasePartTextures, eyeTexture, furAlpha } from './textures.js';
 import { behaviorOf } from './behavior.js';
 
 const INK = 0x4a3330;
@@ -59,6 +59,8 @@ export function buildCat(cat, opts = {}) {
   const b = cat.body;
   const long = app.long && !app.hairless;
   const root = new THREE.Group();
+  root.userData.textureSet = tex;
+  try {
   const rig = new THREE.Group(); root.add(rig);
 
   const matBody = toon(0xffffff, { map: tex.body });
@@ -245,6 +247,7 @@ export function buildCat(cat, opts = {}) {
   };
   root.userData.parts = { rig, head, tailGroup, app };
   return root;
+  } catch (error) { disposeCat(root); throw error; }
 }
 
 /* ───────── 스페셜 의상 10종 ───────── */
@@ -325,6 +328,8 @@ function addCostume(id, head, rig, d) {
 }
 
 export function disposeCat(root) {
+  if (root.userData.disposed) return;
+  root.userData.disposed = true;
   const geometries = new Set(), materials = new Set();
   root.traverse(o => {
     if (o.geometry) geometries.add(o.geometry);
@@ -332,5 +337,6 @@ export function disposeCat(root) {
   });
   geometries.forEach(g => g.dispose());
   materials.forEach(m => m.dispose());
+  if (root.userData.textureSet) { releasePartTextures(root.userData.textureSet); root.userData.textureSet = null; }
 }
 void mix;

@@ -110,6 +110,51 @@ try {
     const stored=JSON.parse(memory.getItem('catgene-save-v1'));
     assert(litterState(stored.mine.map(id=>stored.cats[id]),game.now()).total === after, '청소 상태 저장');
   });
+  await check('공유 털 텍스처의 모델별 참조·중복 해제 보호', async () => {
+    const {buildCat,disposeCat}=await import('./cat3d.js');
+    const {texturePoolStats}=await import('./textures.js');
+    const first=game.myCats()[0],live=U.world.catObjs.get(first.id).root;
+    const refs=texturePoolStats().refs;
+    const copy=buildCat(first);
+    assert(copy.userData.textureSet === live.userData.textureSet, '공유 텍스처 재사용');
+    assert(texturePoolStats().refs === refs+1, '모델 참조 횟수');
+    disposeCat(copy); disposeCat(copy);
+    assert(texturePoolStats().refs === refs && live.userData.textureSet, '중복 모델 해제의 참조 보호');
+  });
+  await check('썸네일 대량 생성 후 유휴 캐시 제한·라이브 텍스처 보호', async () => {
+    const {thumbnail}=await import('./stage.js');
+    const {texturePoolStats,clearUnusedTextures}=await import('./textures.js');
+    const {createFounder}=await import('./engine.js');
+    const live=U.world.catObjs.get(game.G.mine[0]).root.userData.textureSet;
+    const before=texturePoolStats(),pixels=live.body.image.toDataURL();
+    let disposedLive=false;const disposed=()=>{disposedLive=true;};
+    live.body.addEventListener('dispose',disposed);
+    try {
+      for(let i=0;i<24;i++) thumbnail(createFounder(`smoke-texture-${i}`,{specialChance:0}),64);
+      const after=texturePoolStats();
+      assert(after.idle<=16 && after.refs===before.refs, '캐시 제한 또는 참조 누적');
+      clearUnusedTextures();
+      assert(texturePoolStats().idle===0 && !disposedLive, '사용 중인 텍스처 해제');
+      assert(live.body.image.toDataURL()===pixels, '라이브 개체의 무늬 변경');
+      U.world.frame();
+    } finally {live.body.removeEventListener('dispose',disposed);}
+  });
+  await check('토티 털 텍스처를 완전히 해제·재생성해도 픽셀 유지', async () => {
+    const {buildCat,disposeCat}=await import('./cat3d.js');
+    const {clearUnusedTextures}=await import('./textures.js');
+    const {createFounder,refreshCat}=await import('./engine.js');
+    const cat=createFounder('smoke-barr-rebuild',{sex:'F',specialChance:0});
+    cat.genome.O=['O','o'];const tortie=refreshCat(cat);
+    let first,second;
+    try {
+      first=buildCat(tortie);
+      const texture=first.userData.textureSet.body,pixels=texture.image.toDataURL();
+      disposeCat(first); clearUnusedTextures();
+      second=buildCat(tortie);
+      assert(second.userData.textureSet.body!==texture, '완전 해제 후 새 텍스처 생성');
+      assert(second.userData.textureSet.body.image.toDataURL()===pixels, '토티 패치 재생성 일관성');
+    } finally {if(first)disposeCat(first);if(second)disposeCat(second);}
+  });
   await check('실제 브라우저 저장 원본 보존', () => {
     assert(originalStorage.getItem('catgene-save-v1') === originalSave, '원래 게임 진행이 변경되었습니다');
     assert(window.localStorage === memory, '메모리 저장 격리 유지');

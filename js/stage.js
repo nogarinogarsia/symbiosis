@@ -152,11 +152,12 @@ export function thumbnail(cat, size = 180) {
   const root = buildCat(cat);
   root.rotation.y = 0.35;
   root.userData.tick?.(0.2);
-  thumbScene.add(root);
-  thumbR.render(thumbScene, thumbCam);
-  const url = thumbR.domElement.toDataURL('image/png');
-  thumbScene.remove(root);
-  disposeCat(root);
+  let url;
+  try {
+    thumbScene.add(root);
+    thumbR.render(thumbScene, thumbCam);
+    url = thumbR.domElement.toDataURL('image/png');
+  } finally { thumbScene.remove(root); disposeCat(root); }
   if (thumbCache.size > 400) thumbCache.delete(thumbCache.keys().next().value);
   thumbCache.set(key, url);
   return url;

@@ -1,9 +1,14 @@
 // 부위별 털 텍스처를 캔버스로 절차 생성 (태비·흰반점·토티 패치·TYR 포인트·실버·판타지)
 import { RNG, hashSeed } from './rng.js';
 import { hexToRgb, mix, FANTASY_PALETTE } from './appearance.js';
+import { patchMap } from './patches.js';
+import { ResourcePool } from './resource-pool.js';
 
 const SIZES = { body: [256, 128], head: [256, 128], legs: [128, 64], thigh: [128, 64], tail: [256, 64], ears: [32, 32] };
-const cache = new Map();
+const cache = new ResourcePool(16, set => Object.values(set).forEach(texture => texture.dispose()));
+export const texturePoolStats = () => cache.stats();
+export const clearUnusedTextures = () => cache.trim(0);
+export const releasePartTextures = set => cache.release(set);
 
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 function noise1(x, seed) { return Math.sin(x * 12.9898 + seed) * 43758.5453 % 1; }
@@ -125,24 +130,6 @@ function speckleLayer(W, H, rng, n, rmax) {
   return g.getImageData(0, 0, W, H).data;
 }
 
-function patchMap(W, H, rng) {
-  const K = 16, seeds = [];
-  for (let i = 0; i < K; i++) seeds.push({ x: rng.range(0, W), y: rng.range(0, H), v: rng.chance(0.5) ? 1 : 0 });
-  const m = new Uint8Array(W * H);
-  const wob = rng.range(0, 100);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const px = x + Math.sin(y * 0.15 + wob) * 6, py = y + Math.sin(x * 0.11 + wob) * 4;
-    let best = 1e9, v = 0;
-    for (const s of seeds) {
-      let dx = Math.abs(px - s.x); if (dx > W / 2) dx = W - dx;
-      const dy = py - s.y; const d = dx * dx + dy * dy;
-      if (d < best) { best = d; v = s.v; }
-    }
-    m[y * W + x] = v;
-  }
-  return m;
-}
-
 const rgbCache = new Map();
 function rgb(hex) { let v = rgbCache.get(hex); if (!v) { v = hexToRgb(hex); rgbCache.set(hex, v); } return v; }
 
@@ -230,17 +217,18 @@ export function makePartCanvas(part, app, seed) {
 
 export function partTextures(THREE, cat, app) {
   const key = cat.seed + '|' + app.renderSig;
-  if (cache.has(key)) return cache.get(key);
-  const set = {};
-  for (const part of Object.keys(SIZES)) {
-    const tex = new THREE.CanvasTexture(makePartCanvas(part, app, cat.seed));
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = THREE.RepeatWrapping; tex.anisotropy = 4;
-    set[part] = tex;
-  }
-  if (cache.size > 60) cache.delete(cache.keys().next().value);
-  cache.set(key, set);
-  return set;
+  return cache.acquire(key, () => {
+    const set = {};
+    try {
+      for (const part of Object.keys(SIZES)) {
+        const tex = new THREE.CanvasTexture(makePartCanvas(part, app, cat.seed));
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping; tex.anisotropy = 4;
+        set[part] = tex;
+      }
+      return set;
+    } catch (error) { Object.values(set).forEach(texture => texture.dispose()); throw error; }
+  });
 }
 
 /* 눈 텍스처: 성격별 눈 모양 8종 + 갓 태어난(성격 미정) 기본형 */
