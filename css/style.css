@@ -93,3 +93,24 @@ table.g td,table.g th{padding:3px 6px;border-bottom:1px dashed var(--line);text-
 .hint{font-size:12px;color:var(--ink2)}
 .sheen{background:linear-gradient(90deg,#ff9ad5,#9ae7ff,#fff29a,#9aff9e);-webkit-background-clip:text;background-clip:text;color:transparent}
 @media (max-width:980px){main{grid-template-columns:1fr;grid-template-rows:42vh 1fr}}
+
+/* ───── 월드 레이아웃 (오버라이드) ───── */
+body{overflow:hidden}
+#world{position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none}
+#top{position:fixed;top:0;left:0;right:0;z-index:10}
+#hint{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:9;background:#fffaf0e0;border:3px solid #fff;border-radius:99px;padding:4px 18px;font-size:13px;color:var(--ink2);pointer-events:none;white-space:nowrap}
+#panel{position:fixed;right:16px;top:70px;bottom:104px;width:440px;max-width:calc(100vw - 32px);z-index:20;padding-top:34px}
+#panel[hidden]{display:none}
+.xbtn{position:absolute;right:14px;top:10px;width:36px;height:36px;border-radius:50%;border:3px solid #fff;background:var(--peach);color:#fff;font-size:16px;box-shadow:0 3px 0 var(--peach-d);z-index:2}
+#fxLayer{position:fixed;inset:0;pointer-events:none;z-index:15;overflow:hidden}
+#tabs{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);z-index:12;padding:0}
+#breedOverlay{position:fixed;inset:0;z-index:35;background:linear-gradient(#e7f5ff,#fff6df 62%,#f4d8b0 62%)}
+#breedOverlay[hidden]{display:none}
+#breedCanvas{width:100%;height:100%;display:block}
+#breedOverlay .cap{position:absolute;top:90px;left:50%;transform:translateX(-50%);font-size:28px;background:#fffaf0e8;border:4px solid #fff;border-radius:99px;padding:6px 26px;box-shadow:var(--shadow)}
+
+@media (max-width:760px){
+  .brand{font-size:15px}.brand small,.dev,#hint{display:none}.clock{display:none}
+  #top{padding:8px 10px;gap:8px}.pill{font-size:13px;padding:4px 10px}
+  #panel{left:8px;right:8px;width:auto;top:56px;bottom:96px}
+}

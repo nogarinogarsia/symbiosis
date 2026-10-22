@@ -1,4 +1,5 @@
 import { Stage, thumbnail } from './stage.js';
+import { World } from './world.js';
 import { G, now, cat, myCats, shopCats, tick, care, sell, trade, doBreed, checkBreed, breedCost, sourceOf, collectIncome,
   pendingIncome, skipTime, reset, dexTotals, save } from './game.js';
 import { phenotypeName, gradeLabel, sellPrice, shopBreedPrice, incomePerHour, canBreed, SPECIALS, FANTASY, COSTUMES, COLOR_KO, TYR_KO, isForbiddenPair } from './engine.js';
@@ -6,7 +7,7 @@ import { PERSONALITIES, CARE_ACTIONS, careCooldown, growthRemaining } from './pe
 import { GRADES, GRADE_COLORS, PARAMS } from './params.js';
 
 const $ = (s) => document.querySelector(s);
-const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, dexPage: 1, dexGrade: -1, busy: false };
+const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, world: null, open: false, npc: null, dexPage: 1, dexGrade: -1, busy: false };
 export { U };
 
 /* ───── 공통 헬퍼 ───── */
@@ -51,7 +52,8 @@ const desc = (c) => (c.special ? `${SPECIALS[c.special]} · ` : '') + (c.fantasy
 
 /* ───── 렌더 ───── */
 export function init() {
-  U.stage = new Stage($('#stage'));
+  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => { U.sel = id; openPanel('home'); } });
+  U.world.setupNpcs(G.npcs);
   document.addEventListener('click', onClick);
   $('#btnIncome').onclick = () => { const n = collectIncome(); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
   if (!U.sel || !cat(U.sel)) U.sel = myCats()[0]?.id ?? null;
@@ -59,40 +61,41 @@ export function init() {
   render();
 }
 
+function handleZone(id) {
+  if (U.busy) return;
+  if (id === 'shop') openPanel('shop');
+  else if (id === 'breed') openPanel('breed');
+  else if (id.startsWith('npc:')) { U.npc = id.slice(4); openPanel('npc'); }
+}
+function openPanel(tab) { U.tab = tab; U.open = true; render(); }
+function closePanel() { U.open = false; render(); }
+
 export function render() {
-  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === U.tab));
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', U.open && b.dataset.tab === U.tab));
   $('#coins').textContent = G.coins.toLocaleString();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   updateClock();
   const P = $('#panel');
-  const scroll = P.scrollTop;
-  P.innerHTML = { home: homeView, breed: breedView, dex: dexView, shop: shopView, npc: npcView }[U.tab]();
-  P.scrollTop = scroll;
-  updateStage();
+  if (!U.open) P.hidden = true;
+  else {
+    const scroll = P.scrollTop;
+    P.hidden = false;
+    P.innerHTML = '<button class="xbtn" data-act="closepanel">✕</button>' + { home: homeView, breed: breedView, dex: dexView, shop: shopView, npc: npcView }[U.tab]();
+    P.scrollTop = scroll;
+  }
+  syncWorld();
 }
-
+function syncWorld() {
+  const d = [];
+  for (const c of myCats()) d.push({ cat: c, pen: 'mine' });
+  for (const n of G.npcs) for (const id of n.cats) { const c = cat(id); if (c) d.push({ cat: c, pen: 'npc:' + n.id }); }
+  U.world.sync(d);
+}
 function updateClock() {
   const d = new Date(now());
   $('#clock').textContent = `🕒 ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
-
 let stageKey = '';
-function updateStage() {
-  if (U.busy) return;
-  const hud = $('#stageHud');
-  if (U.tab === 'breed') {
-    const f = cat(U.breed.father), m = cat(U.breed.mother);
-    const k = `pair|${f?.id}|${m?.id}|${f?.personality}|${m?.personality}`;
-    if (k !== stageKey) { U.stage.showPair(f, m); stageKey = k; }
-    hud.innerHTML = '';
-    return;
-  }
-  const c = cat(U.sel);
-  if (!c) { U.stage.clear(); hud.innerHTML = ''; stageKey = ''; return; }
-  const k = `one|${c.id}|${c.personality}|${c.costume}`;
-  if (k !== stageKey) { U.stage.showCat(c); stageKey = k; }
-  hud.innerHTML = `<div class="hudcard">${c.name} ${sexIcon(c)} ${badge(c)}<small>${desc(c)}</small></div>`;
-}
 
 /* ───── 우리집 ───── */
 function homeView() {
@@ -187,10 +190,14 @@ async function runBreed() {
   const f = cat(B.father), m = cat(B.mother);
   const r = doBreed(B.father, B.mother);
   if (r.error) { toast(r.error); return; }
-  U.busy = true; render0();
+  U.busy = true; U.world.enabled = false; U.open = false; render();
+  const ov = $('#breedOverlay'); ov.hidden = false;
+  if (!U.stage) U.stage = new Stage($('#breedCanvas'));
+  U.stage.resize();
   await U.stage.playBreed(f, m, r.kitten);
-  U.busy = false; stageKey = '';
+  ov.hidden = true; U.busy = false; U.world.enabled = true;
   B.father = null; B.mother = null; B.slot = 'father'; U.sel = r.kitten.id;
+  U.tab = 'home'; U.open = true;
   render();
   showResult(r);
 }
@@ -243,7 +250,7 @@ function shopView() {
 /* ───── 이웃(NPC) ───── */
 function npcView() {
   let html = `<h2>🏘️ 이웃</h2><div class="sub">프로토타입: 이웃(NPC)은 교환과 교배 신청을 언제나 수락해요. 횟수 제한 없음.</div>`;
-  for (const n of G.npcs) {
+  for (const n of (U.npc ? G.npcs.filter((x) => x.id === U.npc) : G.npcs)) {
     html += `<div class="box"><div style="font-size:18px">${n.icon} ${n.name}</div><div class="grid" style="margin-top:6px">`
       + n.cats.map(cat).map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, meta: `<button class="btn sm" data-act="trade" data-npc="${n.id}" data-id="${c.id}">교환</button> <button class="btn sm peach" data-act="npcbreed" data-id="${c.id}">교배신청</button>` })).join('')
       + '</div></div>';
@@ -252,8 +259,8 @@ function npcView() {
 }
 
 /* ───── 모달 ───── */
-function openModal(html) { const m = $('#modal'); m.innerHTML = `<div class="dialog">${html}</div>`; m.hidden = false; }
-function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
+function openModal(html) { const m = $('#modal'); m.innerHTML = `<div class="dialog">${html}</div>`; m.hidden = false; U.world.enabled = false; }
+function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; if (!U.busy) U.world.enabled = true; }
 
 const REC = { B: ['b', 'bl'], D: ['d'], A: ['a'], T: ['m'], S: ['s'], C: ['cb', 'cs'], L: ['l'], I: ['i'], O: ['o'] };
 const LOCI_KO = { B: '갈색(B)', D: '희석(D)', A: '아구티(A)', T: '태비(T)', S: '흰반점(S)', C: '색소제한(C)', L: '털길이(L)', I: '실버(I)', O: '오렌지(X^O)', P1: '농도1', P2: '농도2', P3: '농도3' };
@@ -291,7 +298,7 @@ function showDetail(id, viewOnly) {
 }
 
 /* ───── 이벤트 ───── */
-function gotoTab(t) { U.tab = t; render(); }
+function gotoTab(t) { if (U.open && U.tab === t) { closePanel(); return; } openPanel(t); }
 function onClick(e) {
   const dev = e.target.closest('[data-dev]');
   if (dev) {
@@ -306,6 +313,7 @@ function onClick(e) {
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'closepanel': closePanel(); break;
     case 'select': U.sel = d.id; render(); break;
     case 'care': {
       const r = care(d.id, d.a);
@@ -371,4 +379,4 @@ function everySecond() {
   document.querySelectorAll('button[data-cdun]').forEach((b) => { if (b.disabled && +b.dataset.cdun <= t) render(); });
 }
 
-void canBreed; void save;
+void canBreed; void save; void stageKey;

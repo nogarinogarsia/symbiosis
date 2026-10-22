@@ -31,9 +31,9 @@ function stripeLayer(part, app, W, H, rng) {
     const spine = 0.75 * W;
     g.lineWidth = 6; g.beginPath(); g.moveTo(spine, 0); g.lineTo(spine, H); g.stroke();
     if (!classic) {
-      const N = 13;
+      const N = 11;
       for (let i = 0; i < N; i++) {
-        const y = H * (0.07 + 0.86 * (i + 0.5) / N) + rng.range(-1.5, 1.5);
+        const y = H * (0.2 + 0.73 * (i + 0.5) / N) + rng.range(-1.5, 1.5);
         const len = W * rng.range(0.17, 0.22);
         for (const dir of [-1, 1]) {
           const n = 6;
@@ -58,6 +58,10 @@ function stripeLayer(part, app, W, H, rng) {
         g.lineWidth = 6; g.beginPath(); g.moveTo(spine, H * y); g.lineTo(spine + dir * W * 0.2, H * y); g.stroke();
       }
     }
+    // 어깨선: 목 뒤에서 옆구리 아래로 비스듬히 내려오는 선 앞쪽(가슴·어깨)에는 줄무늬를 그리지 않음
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, 0);
+    for (let x = 0; x <= W; x += 8) { const dx = x < 0.25 * W ? 0.25 * W + x : Math.abs(x - 0.75 * W); g.lineTo(x, H * (0.17 + 0.33 * dx / (0.5 * W))); }
+    g.lineTo(W, 0); g.closePath(); g.fill(); g.globalCompositeOperation = 'source-over';
   } else if (part === 'head') {
     const fx = W * 0.25;
     g.lineWidth = 6;
@@ -282,3 +286,18 @@ export function eyeTexture(THREE, personality, color, mirror) {
 
 export function hashStr(s) { return hashSeed(s); }
 void noise1;
+
+/* 장모 솜털 셸용 알파맵: 값이 임계치보다 클 때만 그려짐 → 바깥 셸일수록 듬성듬성한 솜털 가장자리 */
+const furCache = new Map();
+export function furAlpha(THREE, key, faceMask) {
+  if (furCache.has(key)) return furCache.get(key);
+  const lo = canvas(64, 32), lg = lo.getContext('2d'), li = lg.createImageData(64, 32), r = new RNG('fur' + key);
+  for (let i = 0; i < 64 * 32; i++) { const v = Math.floor(r.next() * 255); li.data[i * 4] = li.data[i * 4 + 1] = li.data[i * 4 + 2] = v; li.data[i * 4 + 3] = 255; }
+  lg.putImageData(li, 0, 0);
+  const c = canvas(512, 256), g = c.getContext('2d');
+  g.imageSmoothingEnabled = true; g.drawImage(lo, 0, 0, 512, 256);
+  if (faceMask) { g.fillStyle = '#000'; g.beginPath(); g.ellipse(128, 140, 70, 80, 0, 0, Math.PI * 2); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  furCache.set(key, t);
+  return t;
+}

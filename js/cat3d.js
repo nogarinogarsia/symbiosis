@@ -1,7 +1,7 @@
 // 코드로 만든 프로시저럴 툰 고양이 (구·캡슐·튜브 조합 + 인버티드 헐 외곽선)
 import * as THREE from 'three';
 import { resolveAppearance, FANTASY_PALETTE, mix } from './appearance.js';
-import { partTextures, eyeTexture } from './textures.js';
+import { partTextures, eyeTexture, furAlpha } from './textures.js';
 
 const INK = 0x4a3330;
 const OUTLINES = false; // 툰 셰이딩은 유지, 테두리는 제거
@@ -32,6 +32,23 @@ function addPart(parent, geo, mat, { pos = [0, 0, 0], scale = [1, 1, 1], rot = [
   }
   parent.add(mesh);
   return mesh;
+}
+
+/* 솜털: 같은 메시를 법선 방향으로 조금씩 부풀린 반투명 셸을 겹쳐 가장자리가 솜처럼 보이게 함 */
+function addFur(parent, geo, map, alphaMap, opts, shells = 6, len = 0.1) {
+  for (let i = 1; i <= shells; i++) {
+    const k = i / shells;
+    const m = new THREE.MeshToonMaterial({ map, gradientMap: gradient(), alphaMap, alphaTest: 0.12 + 0.78 * k });
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uInfl = { value: len * k };
+      sh.vertexShader = sh.vertexShader.replace('void main() {', 'uniform float uInfl;\nvoid main() {')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += normalize(normal) * uInfl;');
+    };
+    m.customProgramCacheKey = () => 'furshell';
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(...(opts.pos || [0, 0, 0])); mesh.scale.set(...(opts.scale || [1, 1, 1])); mesh.rotation.set(...(opts.rot || [0, 0, 0]));
+    parent.add(mesh);
+  }
 }
 const sphere = (r = 1) => new THREE.SphereGeometry(r, 28, 20);
 
@@ -123,6 +140,16 @@ export function buildCat(cat, opts = {}) {
   if (long) {
     for (const s of [-1, 1]) addPart(head, new THREE.ConeGeometry(0.13, 0.25, 6), matHead, { pos: [s * 0.52 * fw, -0.12, 0.05], rot: [0, 0, s * -1.5], outline: 0.02 });
     addPart(rig, new THREE.ConeGeometry(0.28, 0.45, 8), matBody, { pos: [0, 0.78, 0.7], rot: [Math.PI, 0, 0], outline: 0.022 });
+  }
+
+  // 장모: 솜털 셸
+  if (long) {
+    const a = furAlpha(THREE, 'body', false), ah = furAlpha(THREE, 'head', true);
+    addFur(rig, bodyGeo, tex.body, a, { pos: [0, 0.62, 0], scale: [wK, hK, dK] }, 6, 0.11);
+    addFur(head, sphere(), tex.head, ah, { scale: [0.55 * fw, 0.47, 0.5] }, 6, 0.1);
+    for (const sd of [-1, 1]) addFur(rig, sphere(), tex.thigh, a, { pos: [sd * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44] }, 4, 0.08);
+    const tg = tailGroup.children[0];
+    if (tg && tg.geometry) addFur(tailGroup, tg.geometry, tex.tail, a, {}, 5, 0.1);
   }
 
   // SPECIAL 외형 보정
