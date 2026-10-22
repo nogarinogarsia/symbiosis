@@ -73,6 +73,7 @@ export class Stage {
     this.camera.position.set(0, 2.1, 9.2); this.camera.lookAt(0, 0.85, 0);
   }
   frame() {
+    if (document.hidden || this.canvas.closest('[hidden]')) return;
     const t = this.clock.getElapsedTime();
     for (const c of this.cats) {
       c.root.userData.tick?.(t);

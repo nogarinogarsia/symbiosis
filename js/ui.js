@@ -5,7 +5,7 @@ import { G, now, cat, myCats, shopCats, tick, care, sell, trade, doBreed, checkB
 import { phenotypeName, gradeLabel, sellPrice, shopBreedPrice, incomePerHour, canBreed, SPECIALS, FANTASY, COSTUMES, COLOR_KO, TYR_KO, isForbiddenPair } from './engine.js';
 import { PERSONALITIES, CARE_ACTIONS, careCooldown, growthRemaining } from './personality.js';
 import { GRADES, GRADE_COLORS, PARAMS } from './params.js';
-import { comfort } from './wellbeing.js';
+import { comfort, litterState } from './wellbeing.js';
 import { careDaily } from './game.js';
 import { bindTouchControls } from './touch-controls.js';
 import { sound } from './audio.js';
@@ -53,13 +53,18 @@ function card(c, { sel = false, dis = false, meta = '', attr = '' } = {}) {
     <div>${badge(c)}</div><div class="meta">${meta}</div></div>`;
 }
 const desc = (c) => (c.special ? `${SPECIALS[c.special]} · ` : '') + (c.fantasy ? `${FANTASY[c.fantasy]} · ` : '') + phenotypeName(c.ph);
+const litterSummary = state => state.total ? `🧹 화장실 청소 ${state.total}개 · 우리 안 화장실을 클릭하거나 아래 청소 버튼을 눌러 주세요.` : '✨ 우리 안 화장실이 깨끗해요.';
 
 /* ───── 렌더 ───── */
 export function init() {
   U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => {
     if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
     else showDetail(id, true);
-  }, onFocus: id => { $('#watchingCat').hidden = !id; $('#watchingCat').dataset.id = id ?? ''; $('#watchingLabel').textContent = id ? `${cat(id).name} 관찰 중 · ${U.world.activityOf(id)}` : ''; } });
+  }, onFocus: id => { $('#watchingCat').hidden = !id; $('#watchingCat').dataset.id = id ?? ''; $('#watchingLabel').textContent = id ? `${cat(id).name} 관찰 중 · ${U.world.activityOf(id)}` : ''; }, onClean: id => {
+    const result = careDaily(id, 'clean');
+    if (result.ok) { sound.play('clean'); fx('🧹'); toast(`${cat(id).name}의 화장실을 치웠어요`); render(); }
+    else toast(result.msg);
+  } });
   $('#returnCamera').onclick = () => U.world.stopWatching();
   U.world.setupNpcs(G.npcs);
   U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.target = null; });
@@ -132,6 +137,7 @@ function syncWorld() {
   for (const c of myCats()) d.push({ cat: c, pen: 'mine' });
   for (const n of G.npcs) for (const id of n.cats) { const c = cat(id); if (c) d.push({ cat: c, pen: 'npc:' + n.id }); }
   U.world.sync(d);
+  U.world.syncLitter(litterState(myCats(), now()));
 }
 function updateClock() {
   const d = new Date(now());
@@ -145,6 +151,8 @@ function homeView() {
   const c = cat(U.sel);
   const t = now();
   let html = `<h2>🏠 우리집 <small class="hint">고양이 ${cats.length}마리 · 하루 수입 ${Math.round(cats.reduce((s, x) => s + incomePerHour(x) * 24, 0))}</small></h2>`;
+  const litter = litterState(cats, t);
+  html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
   html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button></div>`;
   html += '<p class="hint"><a href="lab.html">🧪 유전 실험실 — 부모 유전자 편집 · 대량 교배 통계</a></p>';
   if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
@@ -436,6 +444,9 @@ function everySecond() {
   updateClock();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   const t = now();
+  const litter = litterState(myCats(), t);
+  U.world.syncLitter(litter);
+  if ($('#litterStatus')) $('#litterStatus').textContent = litterSummary(litter);
   document.querySelectorAll('[data-cat-activity]').forEach(el => { el.textContent = '🐾 ' + U.world.activityOf(el.dataset.catActivity); });
   const watchedId = $('#watchingCat').dataset.id;
   if (watchedId && cat(watchedId)) $('#watchingLabel').textContent = `${cat(watchedId).name} 관찰 중 · ${U.world.activityOf(watchedId)}`;

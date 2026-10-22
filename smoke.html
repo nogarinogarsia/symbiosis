@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>월드·UI 자동 검사 · 냥냥 유전 하우스</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+  <style>#smokeReport{position:fixed;left:12px;top:80px;z-index:200;background:#fffef4f5;border:3px solid white;border-radius:18px;max-width:440px;max-height:75vh;overflow:auto;padding:16px;font:13px/1.7 system-ui,sans-serif;color:#3d4f3a;box-shadow:0 5px 20px #40523840}#smokeReport h1{font-size:18px;margin:0 0 8px}#smokeReport .bad{color:#b63333}#smokeReport .ok{color:#39734d}</style>
+</head>
+<body><section id="smokeReport" aria-live="polite"><h1>월드·UI 자동 검사</h1><p>메모리 저장으로 실행합니다. 원래 진행은 변경하지 않습니다.</p><div id="smokeChecks"></div><p id="smokeSummary">준비 중…</p></section>
+<script type="module" src="js/smoke.js"></script>
+</body>
+</html>

@@ -21,3 +21,16 @@ export function dailyCare(cat, action, now) {
   cat.lastInteraction = { action, at: now };
   return { ok: true, fx: a.icon };
 }
+
+export const LITTER_INTERVAL_MS = 4 * 3600e3;
+export function litterState(cats, now) {
+  const items = [];
+  let total = 0;
+  for (const cat of cats) {
+    const last = cat.wellbeing?.clean ?? cat.birthTime;
+    const count = Math.min(3, Math.floor(Math.max(0, now - last) / LITTER_INTERVAL_MS));
+    total += count;
+    for (let i = 0; i < count && items.length < 12; i++) items.push({ catId: cat.id, index: i, seed: `${cat.seed}:litter:${i}` });
+  }
+  return { total, items };
+}

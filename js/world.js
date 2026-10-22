@@ -148,7 +148,40 @@ export class World {
   }
   buildPens() {
     this.buildPen('mine', -9, 2, 12, 9, '🏠 우리 집', 0xf5e6b8);
+    this.buildLitterTray();
     this.npcPositions = [-24, -12, 0, 12, 24];
+  }
+  buildLitterTray() {
+    const pen = this.pens.mine;
+    const tray = new THREE.Group(); tray.position.set(pen.minX + .6, 0, pen.maxZ - .4);
+    box(2.1, .18, 1.4, 0x9cbda6, 0, .06, 0, tray);
+    box(1.85, .04, 1.15, 0xe6cfa3, 0, .25, 0, tray);
+    for (const x of [-1, 1]) box(.14, .2, 1.4, 0x9cbda6, x, .12, 0, tray);
+    for (const z of [-.65, .65]) box(2.1, .2, .14, 0x9cbda6, 0, .12, z, tray);
+    this.scene.add(tray); this.litterTray = tray;
+    this.litterPiles = new THREE.Group(); tray.add(this.litterPiles);
+  }
+  syncLitter(state) {
+    const key = state.total + '|' + state.items.map(item => `${item.catId}:${item.index}`).join('|');
+    if (key === this.litterKey) return;
+    this.litterKey = key;
+    for (const pile of [...this.litterPiles.children]) { this.litterPiles.remove(pile); disposeCat(pile); }
+    if (this.litterLabel) {
+      this.litterTray.remove(this.litterLabel); this.litterLabel.material.map.dispose(); this.litterLabel.material.dispose();
+    }
+    for (const item of state.items) {
+      const rng = new RNG(item.seed), pile = new THREE.Group();
+      pile.userData.cleanCatId = item.catId;
+      pile.position.set(rng.range(-.75, .75), .3, rng.range(-.4, .4));
+      for (let i = 0; i < 3; i++) {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(.14 - i * .035, 10, 8), toon(0x987252));
+        mesh.position.set(i * .015, i * .1, 0); mesh.scale.y = .65; pile.add(mesh);
+      }
+      this.litterPiles.add(pile);
+    }
+    this.litterLabel = label(state.total ? `🧹 청소 ${state.total}` : '✨ 깨끗한 화장실', { scale: .62, bg: state.total ? '#ffe5c7' : '#edf5df' });
+    this.litterLabel.position.set(0, 1.6, 0); this.litterTray.add(this.litterLabel);
+    this.litterTray.userData.cleanCatId = state.items[0]?.catId ?? null;
   }
   /* NPC 우리는 game 데이터가 정해진 뒤 만든다 */
   setupNpcs(npcs) {
@@ -227,10 +260,11 @@ export class World {
     this.ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);
     const catRoots = [...this.catObjs.values()].map((c) => c.holder);
-    const hits = this.ray.intersectObjects([...catRoots, ...this.npcAvatars, ...(this.clickables || [])], true);
+    const hits = this.ray.intersectObjects([...catRoots, ...this.npcAvatars, this.litterTray, ...(this.clickables || [])], true);
     for (const h of hits) {
       let o = h.object;
       while (o) {
+        if (o.userData.cleanCatId) { this.hooks.onClean?.(o.userData.cleanCatId); return; }
         if (o.userData.catId) { this.hooks.onCat?.(o.userData.catId); return; }
         if (o.userData.npcId) { this.hooks.onZone?.('npc:' + o.userData.npcId, true); return; }
         if (o.userData.zoneId) { this.hooks.onZone?.(o.userData.zoneId, true); return; }
