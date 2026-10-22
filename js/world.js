@@ -43,7 +43,7 @@ export class World {
     this.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
     this.clock = new THREE.Clock();
     this.colliders = []; this.zones = []; this.pens = {}; this.catObjs = new Map(); this.npcAvatars = []; this.pulsers = [];
-    this.keys = {}; this.target = null; this.enabled = true; this.inside = {};
+    this.keys = {}; this.target = null; this.enabled = true; this.inside = {}; this.stick = { x: 0, y: 0 };
     this.buildGround(); this.buildDecor(); this.buildBuildings(); this.buildPens();
     this.player = this.makeAvatar({ hair: 0xf1e3c8, shirt: 0xffffff, stripe: 0x3a4a63, pants: 0x4a5f8a, skin: 0xf3c9a6 });
     this.player.position.set(-1, 0, 13); this.scene.add(this.player);
@@ -200,7 +200,8 @@ export class World {
     const k = (e, v) => {
       const key = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        if (!v) { delete this.keys[key]; return; }
+        if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
         this.keys[key] = v; if (v) this.target = null; e.preventDefault();
       }
     };
@@ -209,6 +210,7 @@ export class World {
     this.ray = new THREE.Raycaster(); this.ndc = new THREE.Vector2();
     let down = null;
     this.canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
+    this.canvas.addEventListener('pointercancel', () => { down = null; });
     this.canvas.addEventListener('pointerup', (e) => {
       if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
       down = null; if (!this.enabled) return;
@@ -290,6 +292,7 @@ export class World {
     const p = this.player;
     let dx = 0, dz = 0;
     if (this.enabled) {
+      dx = this.stick.x; dz = this.stick.y;
       if (this.keys.w || this.keys.arrowup) dz -= 1; if (this.keys.s || this.keys.arrowdown) dz += 1;
       if (this.keys.a || this.keys.arrowleft) dx -= 1; if (this.keys.d || this.keys.arrowright) dx += 1;
       if (!dx && !dz && this.target) {
@@ -299,7 +302,7 @@ export class World {
     }
     const moving = dx || dz;
     if (moving) {
-      const l = Math.hypot(dx, dz); dx /= l; dz /= l;
+      const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
       const sp = 6.2 * dt;
       this.tryMove(p.position, dx * sp, 0); this.tryMove(p.position, 0, dz * sp);
       const ang = Math.atan2(dx, dz);

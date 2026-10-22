@@ -7,6 +7,8 @@ import { PERSONALITIES, CARE_ACTIONS, careCooldown, growthRemaining } from './pe
 import { GRADES, GRADE_COLORS, PARAMS } from './params.js';
 import { comfort } from './wellbeing.js';
 import { careDaily } from './game.js';
+import { bindTouchControls } from './touch-controls.js';
+import { sound } from './audio.js';
 
 const $ = (s) => document.querySelector(s);
 const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, world: null, open: false, npc: null, dexPage: 1, dexGrade: -1, dexSearch: '', busy: false };
@@ -54,8 +56,22 @@ const desc = (c) => (c.special ? `${SPECIALS[c.special]} · ` : '') + (c.fantasy
 
 /* ───── 렌더 ───── */
 export function init() {
-  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => { U.sel = id; openPanel('home'); } });
+  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => {
+    if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
+    else showDetail(id, true);
+  } });
   U.world.setupNpcs(G.npcs);
+  U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.target = null; });
+  document.addEventListener('visibilitychange', () => { sound.visibility(document.hidden).catch(() => toast('소리를 다시 켜 주세요')); });
+  $('#btnSound').onclick = async () => {
+    const button = $('#btnSound'); button.disabled = true;
+    try {
+      const enabled = await sound.setEnabled(!sound.enabled);
+      button.textContent = enabled ? '🔊' : '🔇'; button.setAttribute('aria-pressed', String(enabled));
+      button.setAttribute('aria-label', enabled ? '소리 끄기' : '소리 켜기'); button.title = enabled ? '소리 끄기' : '소리 켜기';
+    } catch (err) { toast(err.message); }
+    finally { button.disabled = false; }
+  };
   document.addEventListener('click', onClick);
   document.addEventListener('change', e => {
     if (e.target.id === 'dexSearch') { U.dexSearch = e.target.value; U.dexPage = 1; render(); }
@@ -79,7 +95,7 @@ export function init() {
     } catch (err) { toast(err.message); }
     finally { e.target.value = ''; }
   });
-  $('#btnIncome').onclick = () => { const n = collectIncome(); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
+  $('#btnIncome').onclick = () => { const n = collectIncome(); if (n > 0) sound.play('income'); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
   if (!U.sel || !cat(U.sel)) U.sel = myCats()[0]?.id ?? null;
   setInterval(everySecond, 1000);
   render();
@@ -91,10 +107,11 @@ function handleZone(id) {
   else if (id === 'breed') openPanel('breed');
   else if (id.startsWith('npc:')) { U.npc = id.slice(4); openPanel('npc'); }
 }
-function openPanel(tab) { U.tab = tab; U.open = true; render(); }
+function openPanel(tab) { U.clearStick?.(); U.world.keys = {}; U.world.target = null; U.tab = tab; U.open = true; render(); }
 function closePanel() { U.open = false; render(); }
 
 export function render() {
+  $('#touchStick').hidden = U.open || U.busy || !$('#modal').hidden;
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', U.open && b.dataset.tab === U.tab));
   $('#coins').textContent = G.coins.toLocaleString();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
@@ -218,6 +235,7 @@ async function runBreed() {
   const f = cat(B.father), m = cat(B.mother);
   const r = doBreed(B.father, B.mother);
   if (r.error) { toast(r.error); return; }
+  sound.play('breed');
   U.busy = true; U.world.enabled = false; U.open = false; render();
   const ov = $('#breedOverlay'); ov.hidden = false;
   if (!U.stage) U.stage = new Stage($('#breedCanvas'));
@@ -232,6 +250,7 @@ async function runBreed() {
 function render0() { $('#coins').textContent = G.coins.toLocaleString(); }
 
 function showResult(r) {
+  sound.play('birth');
   const k = r.kitten;
   openModal(`<h2>🎉 새 가족이 태어났어요!</h2>
     <div class="row" style="align-items:flex-start"><img src="${thumbnail(k, 220)}" style="width:200px;border-radius:20px;background:#fdeccd">
@@ -290,8 +309,8 @@ function npcView() {
 }
 
 /* ───── 모달 ───── */
-function openModal(html) { const m = $('#modal'); m.innerHTML = `<div class="dialog">${html}</div>`; m.hidden = false; U.world.enabled = false; }
-function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; if (!U.busy) U.world.enabled = true; }
+function openModal(html) { U.clearStick?.(); U.world.keys = {}; U.world.target = null; $('#touchStick').hidden = true; const m = $('#modal'); m.innerHTML = `<div class="dialog" role="dialog" aria-modal="true">${html}</div>`; m.hidden = false; U.world.enabled = false; }
+function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; if (!U.busy) U.world.enabled = true; $('#touchStick').hidden = U.open || U.busy; }
 
 const REC = { B: ['b', 'bl'], D: ['d'], A: ['a'], T: ['m'], S: ['s'], C: ['cb', 'cs'], L: ['l'], I: ['i'], O: ['o'] };
 const LOCI_KO = { B: '갈색(B)', D: '희석(D)', A: '아구티(A)', T: '태비(T)', S: '흰반점(S)', C: '색소제한(C)', L: '털길이(L)', I: '실버(I)', O: '오렌지(X^O)', P1: '농도1', P2: '농도2', P3: '농도3' };
@@ -346,7 +365,7 @@ function onClick(e) {
   switch (d.act) {
     case 'dailycare': {
       const r = careDaily(d.id, d.a);
-      if (r.ok) { fx(r.fx); U.world.react(d.id, d.a); } else toast(r.msg);
+      if (r.ok) { fx(r.fx); sound.play(d.a); U.world.react(d.id, d.a); } else toast(r.msg);
       render(); break;
     }
     case 'backup': {
@@ -359,7 +378,7 @@ function onClick(e) {
     case 'select': U.sel = d.id; render(); break;
     case 'care': {
       const r = care(d.id, d.a);
-      if (!r.ok) toast(r.msg); else { fx(r.fx, 5); U.world.react(d.id, d.a); }
+      if (!r.ok) toast(r.msg); else { fx(r.fx, 5); sound.play(d.a); U.world.react(d.id, d.a); }
       render(); break; }
     case 'detail': e.stopPropagation(); showDetail(d.id, !!d.view); break;
     case 'close': closeModal(); break;

@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { G, newGame, save, load, exportSave, importSave, skipTime, sell, checkBreed, care, now, refreshShop } from '../js/game.js';
+import { G, newGame, save, load, exportSave, importSave, skipTime, sell, checkBreed, care, now, refreshShop, loadIssue, reset } from '../js/game.js';
 import { applyCare, personalityOdds } from '../js/personality.js';
 import { comfort, dailyCare } from '../js/wellbeing.js';
 
 const memory = new Map();
-globalThis.localStorage = { setItem: (k, v) => memory.set(k, v), getItem: k => memory.get(k), removeItem: k => memory.delete(k) };
+globalThis.localStorage = { setItem: (k, v) => memory.set(k, v), getItem: k => memory.get(k) ?? null, removeItem: k => memory.delete(k) };
 
 test('save round trip preserves cats and progress', () => {
   newGame(); const before = exportSave(); const ids = [...G.mine];
@@ -73,4 +73,23 @@ test('unsafe imported names and broken ancestors cannot replace progress', () =>
   assert.throws(() => importSave(JSON.stringify(data)));
   data.cats[data.mine[0]].name = '모찌'; data.cats[data.mine[0]].fatherId = '__proto__';
   assert.throws(() => importSave(JSON.stringify(data)));
+});
+test('corrupt automatic save is preserved until explicit recovery', () => {
+  newGame(); const valid = exportSave();
+  for (const invalid of ['', '{broken', JSON.stringify({ version: 99 })]) {
+    memory.set('catgene-save-v1', invalid);
+    assert.equal(load(), false); assert.equal(loadIssue.raw, invalid);
+    assert.equal(save(), false); assert.equal(memory.get('catgene-save-v1'), invalid);
+    assert.throws(() => importSave('{invalid'));
+    assert.equal(save(), false);
+    importSave(valid); assert.equal(loadIssue, null); assert.equal(load(), true);
+  }
+});
+test('unavailable storage does not masquerade as a missing save', () => {
+  const get = localStorage.getItem;
+  localStorage.getItem = () => { throw new Error('SecurityError'); };
+  assert.equal(load(), false); assert.equal(loadIssue.raw, null);
+  assert.equal(save(), false);
+  localStorage.getItem = get;
+  reset(); assert.equal(loadIssue, null); assert.equal(save(), true);
 });

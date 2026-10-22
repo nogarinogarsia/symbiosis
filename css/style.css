@@ -120,6 +120,11 @@ body{overflow:hidden}
 button:focus-visible,input:focus-visible{outline:3px solid #397f84;outline-offset:3px}
 .dex-search{display:block;margin:12px 0;color:var(--ink2)}
 .dex-search input{display:block;width:100%;margin-top:6px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;font:inherit;box-sizing:border-box;background:#fffdf8;color:var(--ink)}
+.recovery{position:fixed;inset:0;z-index:100;background:#e8eedf;display:grid;place-items:center;padding:20px}.recovery .dialog{box-sizing:border-box}.recovery p{line-height:1.7}
+#touchStick{display:none;position:fixed;left:22px;bottom:116px;width:116px;height:116px;border-radius:50%;border:3px solid #fff9;background:#fff6;z-index:11;touch-action:none;user-select:none;box-sizing:border-box}
+#touchStick[hidden]{display:none!important}.stick-knob{position:absolute;left:31px;top:31px;width:48px;height:48px;border-radius:50%;background:#ffffffe8;box-shadow:0 3px 10px #59725840;border:2px solid #c4d5ad;box-sizing:border-box;pointer-events:none}.stick-caption{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:11px;color:#506d4e;pointer-events:none}
+@media(pointer:coarse){#touchStick{display:block}}
+@media(max-width:760px){#touchStick{display:block}.pill.sound{padding:4px 7px;min-width:30px}.brand{white-space:nowrap;font-size:13px}#top{gap:4px}.top-right{gap:3px}}
 @media(max-width:760px){
   #tabs{bottom:max(6px,env(safe-area-inset-bottom));gap:3px}
   #tabs button{padding:7px 9px;font-size:12px}

@@ -11,6 +11,7 @@ export const G = {
   coins: 0, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: 0, shopRefreshAt: 0, offset: 0, seq: 0, log: [],
 };
 export let saveError = '';
+export let loadIssue = null;
 
 export const now = () => Date.now() + G.offset;
 const uid = () => randomSeedString();
@@ -51,6 +52,7 @@ export function refreshShop(t = now()) {
 }
 
 export function save() {
+  if (loadIssue) { saveError = '기존 저장을 보호하고 있어요. 복구 화면에서 진행 방법을 선택해 주세요.'; return false; }
   try { localStorage.setItem(KEY, exportSave()); saveError = ''; return true; }
   catch { saveError = '저장 공간에 기록하지 못했어요. 진행 백업을 내려받아 주세요.'; return false; }
 }
@@ -61,17 +63,23 @@ export function importSave(raw) {
   // Commit only after parsing, validation, and phenotype rebuilding all succeed.
   Object.assign(G, { coins: data.coins, cats, mine: data.mine, shop: data.shop, npcs: data.npcs,
     dex: data.dex, lastCollect: data.lastCollect, shopRefreshAt: Number.isFinite(data.shopRefreshAt) ? data.shopRefreshAt : Date.now() + data.offset + PARAMS.shopRefreshMs, offset: data.offset, seq: data.seq ?? 0, log: Array.isArray(data.log) ? data.log : [] });
+  loadIssue = null;
   return save();
 }
 export function load() {
+  let raw = null;
+  loadIssue = null;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return false;
+    raw = localStorage.getItem(KEY);
+    if (raw === null) return false;
     importSave(raw);
     return true;
-  } catch { return false; }
+  } catch {
+    loadIssue = { raw, message: raw === null ? '브라우저 저장 공간을 읽지 못했어요.' : '기존 저장 파일을 읽지 못했어요. 원본을 덮어쓰지 않고 보호하고 있습니다.' };
+    return false;
+  }
 }
-export function reset() { try { localStorage.removeItem(KEY); } catch { /* */ } newGame(); }
+export function reset() { loadIssue = null; try { localStorage.removeItem(KEY); } catch { /* */ } newGame(); }
 
 export const cat = (id) => G.cats[id];
 export const myCats = () => G.mine.map(cat).filter(Boolean);
