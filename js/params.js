@@ -23,6 +23,7 @@ export const PARAMS = {
   dexMilestoneEvery: 25,
   dexMilestoneReward: 200,
   shopSize: 8,
+  shopRefreshMs: 6 * 3600e3,          // [제안] 6시간마다 새 교배 상대 입고
   startCoins: 200,
 };
 

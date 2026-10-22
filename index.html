@@ -26,11 +26,15 @@
 <div id="fxLayer"></div>
 <nav id="tabs">
   <button data-tab="home"><span>🐱</span>내 고양이</button>
+  <button data-tab="breed"><span>💞</span>교배</button>
+  <button data-tab="shop"><span>🛍️</span>동물샵</button>
+  <button data-tab="npc"><span>🏘️</span>이웃</button>
   <button data-tab="dex"><span>📖</span>도감</button>
 </nav>
 <div id="breedOverlay" hidden><canvas id="breedCanvas"></canvas><div class="cap">두근두근… 💞</div></div>
 <div id="toasts"></div>
 <div id="modal" hidden></div>
+<input type="file" id="saveFile" accept="application/json,.json" hidden>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

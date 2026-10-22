@@ -114,3 +114,19 @@ body{overflow:hidden}
   #top{padding:8px 10px;gap:8px}.pill{font-size:13px;padding:4px 10px}
   #panel{left:8px;right:8px;width:auto;top:56px;bottom:96px}
 }
+
+#tabs{display:flex;max-width:calc(100vw - 12px);width:max-content;gap:5px}
+#tabs button{min-width:0;padding:8px 14px;white-space:nowrap}
+button:focus-visible,input:focus-visible{outline:3px solid #397f84;outline-offset:3px}
+.dex-search{display:block;margin:12px 0;color:var(--ink2)}
+.dex-search input{display:block;width:100%;margin-top:6px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;font:inherit;box-sizing:border-box;background:#fffdf8;color:var(--ink)}
+@media(max-width:760px){
+  #tabs{bottom:max(6px,env(safe-area-inset-bottom));gap:3px}
+  #tabs button{padding:7px 9px;font-size:12px}
+  #tabs button span{font-size:22px}
+  .dialog{padding:14px;border-radius:22px;max-height:85dvh}
+  #panel{bottom:100px;max-height:calc(100dvh - 160px)}
+  .top-right{gap:4px}.pill{font-size:11px;padding:4px 6px}
+  .care{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){.fx,.toast,.dialog{animation:none!important}}

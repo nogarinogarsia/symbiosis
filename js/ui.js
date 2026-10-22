@@ -1,13 +1,15 @@
 import { Stage, thumbnail } from './stage.js';
 import { World } from './world.js';
 import { G, now, cat, myCats, shopCats, tick, care, sell, trade, doBreed, checkBreed, breedCost, sourceOf, collectIncome,
-  pendingIncome, skipTime, reset, dexTotals, save } from './game.js';
+  pendingIncome, skipTime, reset, dexTotals, save, exportSave, importSave, saveError } from './game.js';
 import { phenotypeName, gradeLabel, sellPrice, shopBreedPrice, incomePerHour, canBreed, SPECIALS, FANTASY, COSTUMES, COLOR_KO, TYR_KO, isForbiddenPair } from './engine.js';
 import { PERSONALITIES, CARE_ACTIONS, careCooldown, growthRemaining } from './personality.js';
 import { GRADES, GRADE_COLORS, PARAMS } from './params.js';
+import { comfort } from './wellbeing.js';
+import { careDaily } from './game.js';
 
 const $ = (s) => document.querySelector(s);
-const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, world: null, open: false, npc: null, dexPage: 1, dexGrade: -1, busy: false };
+const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, world: null, open: false, npc: null, dexPage: 1, dexGrade: -1, dexSearch: '', busy: false };
 export { U };
 
 /* ───── 공통 헬퍼 ───── */
@@ -55,6 +57,28 @@ export function init() {
   U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => { U.sel = id; openPanel('home'); } });
   U.world.setupNpcs(G.npcs);
   document.addEventListener('click', onClick);
+  document.addEventListener('change', e => {
+    if (e.target.id === 'dexSearch') { U.dexSearch = e.target.value; U.dexPage = 1; render(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.target.id === 'dexSearch' && e.key === 'Enter') { U.dexSearch = e.target.value; U.dexPage = 1; render(); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !U.busy) { closeModal(); closePanel(); } });
+  $('#saveFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error('10MB 이하의 저장 파일을 골라 주세요');
+      const raw = await file.text();
+      const { validateSave } = await import('./save-data.js');
+      validateSave(JSON.parse(raw));
+      if (!confirm('이 백업으로 현재 진행을 교체할까요? 먼저 현재 진행을 백업해 두세요.')) return;
+      importSave(raw);
+      U.sel = myCats()[0]?.id ?? null; U.breed.father = null; U.breed.mother = null;
+      U.world.setupNpcs(G.npcs); closeModal(); render(); toast('진행을 불러왔어요');
+    } catch (err) { toast(err.message); }
+    finally { e.target.value = ''; }
+  });
   $('#btnIncome').onclick = () => { const n = collectIncome(); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
   if (!U.sel || !cat(U.sel)) U.sel = myCats()[0]?.id ?? null;
   setInterval(everySecond, 1000);
@@ -103,12 +127,15 @@ function homeView() {
   const c = cat(U.sel);
   const t = now();
   let html = `<h2>🏠 우리집 <small class="hint">고양이 ${cats.length}마리 · 하루 수입 ${Math.round(cats.reduce((s, x) => s + incomePerHour(x) * 24, 0))}</small></h2>`;
+  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button></div>`;
+  html += '<p class="hint"><a href="lab.html">🧪 유전 실험실 — 부모 유전자 편집 · 대량 교배 통계</a></p>';
+  if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
   if (c) html += detailBox(c, t);
   html += `<h3>우리 고양이들</h3><div class="grid">` + cats.map((x) => {
     const gr = growthRemaining(x, t);
     return card(x, { sel: x.id === U.sel, attr: `data-act="select" data-id="${x.id}"`, meta: gr > 0 ? `🍼 <span data-until="${x.birthTime + PARAMS.growthWindowMs}">${fmt(gr)}</span>` : `${PERSONALITIES[x.personality].emoji} ${PERSONALITIES[x.personality].name}` });
   }).join('') + '</div>';
-  if (!cats.length) html += '<p class="sub">고양이가 없어요. 동물샵이나 이웃에게서 교배로 가족을 늘려 보세요!</p>';
+  if (!cats.length) html += '<p class="sub">우리집이 비었어요. 도감은 그대로 보관됩니다. 진행을 백업하거나 새 게임을 시작할 수 있어요.</p><button class="btn sm gray" data-dev="reset">새 게임 시작</button>';
   return html;
 }
 
@@ -130,11 +157,12 @@ function detailBox(c, t) {
     body += `<div class="box" style="margin:0">${p.emoji} <b>${p.name}</b> — ${p.desc}<br><span class="hint">${p.act}</span></div>`;
   }
   const cdLeft = Math.max(0, c.lastBreedAt + PARAMS.breedCooldownMs - t);
+  body += '<h3>오늘의 돌봄</h3><div class="care">' + comfort(c, t).filter(a => gr <= 0 || a.id === 'clean').map(a => `<button data-act="dailycare" data-id="${c.id}" data-a="${a.id}"><span>${a.icon}</span>${a.name}<small class="hint">편안함 ${a.value}%</small></button>`).join('') + '</div><p class="hint">성장 후에도 매일 돌볼 수 있어요. 편안함은 성격·유전·교배 확률에 영향을 주지 않아요.</p>';
   body += `<div class="row" style="margin-top:10px">`
     + `<button class="btn sm" data-act="detail" data-id="${c.id}">🧬 유전자·가계도</button>`
-    + `<button class="btn sm peach" data-act="gobreed" data-id="${c.id}">💞 교배하기</button>`
+    + `<button class="btn sm peach" data-act="gobreed" data-id="${c.id}" ${gr > 0 ? 'disabled' : ''}>💞 교배하기</button>`
     + `<button class="btn sm gray" data-act="sell" data-id="${c.id}">판매 ${sellPrice(c)}🐾</button></div>`
-    + `<div class="hint" style="margin-top:6px">하루 수입 ${incomePerHour(c) * 24}🐾 · ${cdLeft > 0 ? `교배 쿨다운 <span data-until="${c.lastBreedAt + PARAMS.breedCooldownMs}">${fmt(cdLeft)}</span>` : '교배 가능'}</div>`;
+    + `<div class="hint" style="margin-top:6px">하루 수입 ${incomePerHour(c) * 24}🐾 · ${gr > 0 ? '성장 후 교배 가능' : cdLeft > 0 ? `교배 쿨다운 <span data-until="${c.lastBreedAt + PARAMS.breedCooldownMs}">${fmt(cdLeft)}</span>` : '교배 가능'}</div>`;
   return `<div class="box">${body}</div>`;
 }
 
@@ -224,6 +252,8 @@ function dexView() {
   if (U.dexGrade >= 0) entries = entries.filter((e) => e.c.grade === U.dexGrade);
   if (U.dexGrade === 'S') entries = keys.map((k) => ({ k, c: cat(G.dex[k].catId) })).filter((e) => e.c && (e.c.special || e.c.fantasy));
   entries.sort((a, b) => G.dex[b.k].first - G.dex[a.k].first);
+  const query = U.dexSearch.trim().toLocaleLowerCase();
+  if (query) entries = entries.filter(e => `${e.c.name} ${desc(e.c)} ${gradeLabel(e.c)} ${PERSONALITIES[e.c.personality]?.name ?? '성장 중'}`.toLocaleLowerCase().includes(query));
   const shown = entries.slice(0, U.dexPage * 60);
   let html = `<h2>📖 도감</h2>
     <div class="box"><div style="font-size:20px">발견 <b>${tot.found}</b>종</div>
@@ -231,6 +261,7 @@ function dexView() {
     <div class="row" style="margin-bottom:8px"><button class="chip ${U.dexGrade === -1 ? 'on' : ''}" data-act="dexg" data-g="-1">전체</button>`
     + GRADES.map((g, i) => `<button class="chip ${U.dexGrade === i ? 'on' : ''}" data-act="dexg" data-g="${i}">${g}</button>`).join('')
     + `<button class="chip ${U.dexGrade === 'S' ? 'on' : ''}" data-act="dexg" data-g="S">⭐스페셜·판타지</button></div><div class="grid">`;
+  html = html.replace('<div class="grid">', `<label class="dex-search">🔎 도감 검색 <input id="dexSearch" type="search" maxlength="80" placeholder="이름, 털색, 무늬, 성격" value="${U.dexSearch.replace(/[&<>"']/g, x => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]))}"></label><div class="hint">검색 결과 ${entries.length}종 · 입력 후 Enter</div><div class="grid">`);
   html += shown.map((e) => card(e.c, { attr: `data-act="detail" data-id="${e.c.id}" data-view="1"`, meta: '' })).join('') + '</div>';
   if (shown.length < entries.length) html += `<div class="row" style="justify-content:center;margin-top:10px"><button class="btn sm" data-act="dexmore">더 보기</button></div>`;
   if (!entries.length) html += '<p class="sub">아직 이 분류의 고양이를 만나지 못했어요.</p>';
@@ -240,7 +271,7 @@ function dexView() {
 /* ───── 동물샵 ───── */
 function shopView() {
   const sc = shopCats();
-  let html = `<h2>🛍️ 동물샵</h2><div class="sub">마음에 드는 고양이와 교배하면 (재화 지불) 그 고양이는 가게에서 사라지고 새 고양이가 들어와요. 새끼는 항상 1마리, 내가 데려가요.</div><div class="grid">`;
+  let html = `<h2>🛍️ 동물샵</h2><div class="sub">마음에 드는 고양이와 교배하면 (재화 지불) 그 고양이는 가게에서 사라지고 새 고양이가 들어와요. 새끼는 항상 1마리, 내가 데려가요.</div><p class="hint">다음 입고까지 <span data-until="${G.shopRefreshAt}">${fmt(Math.max(0, G.shopRefreshAt - now()))}</span> · 6시간마다 새 친구가 와요</p><div class="grid">`;
   html += sc.map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, meta: `🐾 ${shopBreedPrice(c)}${c.carriers ? ` · 🧬${c.carriers}` : ''}` })).join('') + '</div>';
   html += `<div class="hint" style="margin-top:6px">🧬 숫자 = 겉으로 안 드러나는 희귀 열성 유전자 보인자 수 (가격에 반영)</div>
     <h3>우리 고양이 팔기</h3><div class="grid">` + myCats().map((c) => card(c, { attr: `data-act="sell" data-id="${c.id}"`, meta: `팔기 ${sellPrice(c)}🐾` })).join('') + '</div>';
@@ -313,11 +344,22 @@ function onClick(e) {
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'dailycare': {
+      const r = careDaily(d.id, d.a);
+      if (r.ok) { fx(r.fx); U.world.react(d.id, d.a); } else toast(r.msg);
+      render(); break;
+    }
+    case 'backup': {
+      const url = URL.createObjectURL(new Blob([exportSave()], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = `냥냥하우스-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000); break;
+    }
+    case 'restore': $('#saveFile').click(); break;
     case 'closepanel': closePanel(); break;
     case 'select': U.sel = d.id; render(); break;
     case 'care': {
       const r = care(d.id, d.a);
-      if (!r.ok) toast(r.msg); else fx(r.fx, 5);
+      if (!r.ok) toast(r.msg); else { fx(r.fx, 5); U.world.react(d.id, d.a); }
       render(); break; }
     case 'detail': e.stopPropagation(); showDetail(d.id, !!d.view); break;
     case 'close': closeModal(); break;
@@ -366,11 +408,12 @@ function afterTick() {
 }
 function everySecond() {
   if (U.busy) return;
+  const shopRefreshAt = G.shopRefreshAt;
   const changed = afterTick();
   updateClock();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   const t = now();
-  if (changed) { stageKey = ''; render(); return; }
+  if (changed || shopRefreshAt !== G.shopRefreshAt) { stageKey = ''; render(); return; }
   document.querySelectorAll('[data-until]').forEach((el) => {
     const left = +el.dataset.until - t;
     if (left <= 0) { render(); return; }

@@ -39,14 +39,17 @@ export function growthRemaining(cat, now) {
 
 export function careCooldown(cat, actionId, now) {
   const a = CARE_ACTIONS.find((x) => x.id === actionId);
+  if (!cat || !a) return 0;
   const last = ensureCare(cat).last[actionId] ?? -1e15;
   return Math.max(0, last + a.cd - now);
 }
 
 export function applyCare(cat, actionId, now) {
+  if (!cat) return { ok: false, msg: '고양이를 찾을 수 없어요' };
+  const a = CARE_ACTIONS.find((x) => x.id === actionId);
+  if (!a) return { ok: false, msg: '알 수 없는 돌봄이에요' };
   if (cat.personality !== null && cat.personality !== undefined) return { ok: false, msg: '성격이 이미 정해졌어요' };
   if (growthRemaining(cat, now) <= 0) return { ok: false, msg: '성장 시간이 끝났어요' };
-  const a = CARE_ACTIONS.find((x) => x.id === actionId);
   const care = ensureCare(cat);
   const cd = careCooldown(cat, actionId, now);
   if (cd > 0) return { ok: false, msg: `아직 쉬는 중이에요 (${Math.ceil(cd / 1000)}초)` };
@@ -63,7 +66,8 @@ export function personalityOdds(cat) {
   const idle = Math.max(0, Math.round(PARAMS.growthWindowMs / SLOT) - slotsWithAction);
   for (const i of [1, 3, 5]) scores[i] += idle * IDLE_BONUS;
   if (care.log.length > OVERSTIM) scores[7] += 3;
-  const ex = scores.map((s) => Math.exp(s / TEMPERATURE));
+  const peak = Math.max(...scores);
+  const ex = scores.map((s) => Math.exp((s - peak) / TEMPERATURE));
   const sum = ex.reduce((a, b) => a + b, 0);
   return ex.map((v) => v / sum);
 }

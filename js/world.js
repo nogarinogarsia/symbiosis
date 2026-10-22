@@ -1,6 +1,7 @@
 // 3D 월드: 내 우리 + 이웃 우리 + 동물샵·교배집 건물. 플레이어가 걸어 다니며 다가가면 창이 열림.
 import * as THREE from 'three';
-import { buildCat } from './cat3d.js';
+import { behaviorOf } from './behavior.js';
+import { buildCat, disposeCat } from './cat3d.js';
 import { toon } from './cat3d.js';
 import { addLights } from './stage.js';
 import { RNG } from './rng.js';
@@ -250,7 +251,7 @@ export class World {
     const want = new Map(desired.map((d) => [d.cat.id, d]));
     for (const [id, o] of [...this.catObjs]) {
       const d = want.get(id);
-      if (!d || d.pen !== o.pen || o.key !== this.keyOf(d.cat)) { this.scene.remove(o.holder); this.catObjs.delete(id); }
+      if (!d || d.pen !== o.pen || o.key !== this.keyOf(d.cat)) { this.scene.remove(o.holder); disposeCat(o.root); this.catObjs.delete(id); }
     }
     for (const d of desired) {
       if (this.catObjs.has(d.cat.id) || !this.pens[d.pen]) continue;
@@ -261,10 +262,17 @@ export class World {
       holder.rotation.y = Math.random() * 6.28;
       holder.userData.catId = d.cat.id;
       this.scene.add(holder);
-      this.catObjs.set(d.cat.id, { holder, root, pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * 3, tx: 0, tz: 0, moving: false, speed: 0.9 + Math.random() * 0.5 });
+      const behavior = behaviorOf(d.cat);
+      this.catObjs.set(d.cat.id, { holder, root, behavior, pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * behavior.rest, tx: 0, tz: 0, moving: false, speed: behavior.speed });
     }
   }
-  keyOf(c) { return [c.id, c.personality === null || c.personality === undefined ? 'b' : 'a', c.costume || ''].join('|'); }
+  keyOf(c) { return [c.id, c.personality ?? 'baby', c.costume || ''].join('|'); }
+  react(id, action) {
+    const o = this.catObjs.get(id);
+    if (!o) return;
+    o.root.userData.react?.(action);
+    o.moving = false; o.wait = 5;
+  }
 
   /* ───── 프레임 ───── */
   frame() {
@@ -310,23 +318,25 @@ export class World {
     for (const o of this.catObjs.values()) {
       const pen = this.pens[o.pen], h = o.holder, root = o.root;
       root.userData.tick?.(t);
+      const behavior = o.behavior;
       if (!o.moving) {
         o.wait -= dt;
         root.position.y = 0;
+        root.rotation.z = 0;
         if (o.wait <= 0) {
-          if (Math.random() < 0.55) {
+          if (Math.random() < behavior.chance) {
             o.tx = THREE.MathUtils.lerp(pen.minX, pen.maxX, Math.random()); o.tz = THREE.MathUtils.lerp(pen.minZ, pen.maxZ, Math.random()); o.moving = true;
-          } else o.wait = 1.5 + Math.random() * 4;
+          } else o.wait = behavior.rest * (0.5 + Math.random());
         }
       } else {
         const ex = o.tx - h.position.x, ez = o.tz - h.position.z, dist = Math.hypot(ex, ez);
-        if (dist < 0.15) { o.moving = false; o.wait = 1.5 + Math.random() * 5; root.position.y = 0; continue; }
+        if (dist < 0.15) { o.moving = false; o.wait = behavior.rest * (0.5 + Math.random()); root.position.y = 0; root.rotation.z = 0; continue; }
         const ang = Math.atan2(ex, ez);
         let da = ang - h.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); h.rotation.y += da * Math.min(1, dt * 6);
         const step = Math.min(dist, o.speed * dt);
         h.position.x += ex / dist * step; h.position.z += ez / dist * step;
-        root.position.y = Math.abs(Math.sin(t * 9 + o.speed * 10)) * 0.12;
-        root.rotation.z = Math.sin(t * 9 + o.speed * 10) * 0.04;
+        root.position.y = Math.abs(Math.sin(t * 9 + o.speed * 10)) * behavior.bounce;
+        root.rotation.z = Math.sin(t * 9 + o.speed * 10) * behavior.sway;
       }
     }
   }

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { resolveAppearance, FANTASY_PALETTE, mix } from './appearance.js';
 import { partTextures, eyeTexture, furAlpha } from './textures.js';
+import { behaviorOf } from './behavior.js';
 
 const INK = 0x4a3330;
 const OUTLINES = false; // 툰 셰이딩은 유지, 테두리는 제거
@@ -174,16 +175,37 @@ export function buildCat(cat, opts = {}) {
   rig.scale.setScalar(base * root.userData.sizeMul);
   if (baby) head.scale.multiplyScalar(1.22);
 
-  // 모든 고양이 동일한 아이들 모션 (성격별 모션은 추후)
+  // Different rhythms and head/tail gestures preserve the shared dot-eye style.
+  const behavior = behaviorOf(cat);
+  const yarn = addPart(rig, sphere(.18), toon(0xf09fbc), { pos: [0, .2, 1.35], outline: 0 });
+  yarn.visible = false;
+  let reaction = null;
+  root.userData.react = action => { reaction = { action, start: performance.now() }; };
   const t0 = Math.random() * 10;
   root.userData.tick = (t) => {
     const s = t + t0;
     body.scale.y = hK * (1 + Math.sin(s * 1.8) * 0.014);
-    head.rotation.z = Math.sin(s * 0.9) * 0.04;
+    head.rotation.z = Math.sin(s * 0.9) * behavior.sway;
     head.position.y = 1.28 + Math.sin(s * 1.8) * 0.01;
-    tailGroup.rotation.y = Math.sin(s * 1.6) * 0.22;
+    tailGroup.rotation.y = Math.sin(s * behavior.speed * 1.6) * behavior.tail;
     const blink = (s % 4.2) > 4.05 ? 0.1 : 1;
     for (const e of eyes) e.scale.y = blink;
+    const elapsed = reaction ? (performance.now() - reaction.start) / 1000 : 99;
+    const active = elapsed < 5;
+    yarn.visible = active && reaction.action === 'yarn';
+    rig.rotation.x = 0; rig.rotation.z = 0; head.rotation.x = 0;
+    if (active) {
+      if (reaction.action === 'yarn') {
+        yarn.position.set(Math.sin(elapsed * 4) * .5, .2 + Math.abs(Math.sin(elapsed * 5)) * .1, 1.25);
+        yarn.rotation.z = elapsed * 5; head.rotation.z = Math.sin(elapsed * 4) * .18;
+        rig.rotation.x = Math.sin(elapsed * 6) * .06;
+      } else if (reaction.action === 'feed') {
+        head.rotation.x = .15 + Math.sin(elapsed * 5) * .08;
+      } else if (reaction.action === 'pet') {
+        rig.rotation.z = Math.sin(elapsed * 2) * .12;
+        for (const e of eyes) e.scale.y = .35;
+      }
+    } else head.rotation.x = 0;
   };
   root.userData.parts = { rig, head, tailGroup, app };
   return root;
@@ -267,6 +289,12 @@ function addCostume(id, head, rig, d) {
 }
 
 export function disposeCat(root) {
-  root.traverse((o) => { if (o.geometry) o.geometry.dispose?.(); });
+  const geometries = new Set(), materials = new Set();
+  root.traverse(o => {
+    if (o.geometry) geometries.add(o.geometry);
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) if (m) materials.add(m);
+  });
+  geometries.forEach(g => g.dispose());
+  materials.forEach(m => m.dispose());
 }
 void mix;
