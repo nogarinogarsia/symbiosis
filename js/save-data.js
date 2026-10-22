@@ -7,6 +7,7 @@ export function validateSave(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) fail();
   if (data.version != null && data.version !== 1) fail();
   if (!Number.isFinite(data.coins) || data.coins < 0 || !Number.isFinite(data.offset) || !Number.isFinite(data.lastCollect)) fail();
+  if (data.incomeRemainder != null && (!Number.isFinite(data.incomeRemainder) || data.incomeRemainder < 0 || data.incomeRemainder >= 1)) fail();
   if (!data.cats || typeof data.cats !== 'object' || Array.isArray(data.cats)) fail();
   if (!Array.isArray(data.mine) || !Array.isArray(data.shop) || !Array.isArray(data.npcs) || !data.dex || typeof data.dex !== 'object' || Array.isArray(data.dex)) fail();
   const has = id => typeof id === 'string' && Object.hasOwn(data.cats, id);

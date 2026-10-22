@@ -8,7 +8,7 @@ import { dailyCare } from './wellbeing.js';
 
 const KEY = 'catgene-save-v1';
 export const G = {
-  coins: 0, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: 0, shopRefreshAt: 0, offset: 0, seq: 0, log: [],
+  coins: 0, incomeRemainder: 0, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: 0, shopRefreshAt: 0, offset: 0, seq: 0, log: [],
 };
 export let saveError = '';
 export let loadIssue = null;
@@ -29,7 +29,7 @@ function makeFounder(prefix, opts = {}) {
 
 export function newGame() {
   G.offset = 0;
-  Object.assign(G, { coins: PARAMS.startCoins, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: now(), shopRefreshAt: now() + PARAMS.shopRefreshMs, seq: 0, log: [] });
+  Object.assign(G, { coins: PARAMS.startCoins, incomeRemainder: 0, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: now(), shopRefreshAt: now() + PARAMS.shopRefreshMs, seq: 0, log: [] });
   // 시작 고양이 4마리 (수컷2·암컷2, 12좌위 개체군에서 새로 생성)
   for (const sex of ['M', 'F', 'M', 'F']) { const c = makeFounder('start', { sex, specialChance: 0 }); G.mine.push(c.id); registerDex(c, true); }
   refillShop();
@@ -61,7 +61,7 @@ export function importSave(raw) {
   const data = validateSave(JSON.parse(raw));
   const cats = Object.fromEntries(Object.entries(data.cats).map(([id, c]) => [id, refreshCat({ ...c, lastBreedAt: c.lastBreedAt ?? -1e15 })]));
   // Commit only after parsing, validation, and phenotype rebuilding all succeed.
-  Object.assign(G, { coins: data.coins, cats, mine: data.mine, shop: data.shop, npcs: data.npcs,
+  Object.assign(G, { coins: data.coins, incomeRemainder: data.incomeRemainder ?? 0, cats, mine: data.mine, shop: data.shop, npcs: data.npcs,
     dex: data.dex, lastCollect: data.lastCollect, shopRefreshAt: Number.isFinite(data.shopRefreshAt) ? data.shopRefreshAt : Date.now() + data.offset + PARAMS.shopRefreshMs, offset: data.offset, seq: data.seq ?? 0, log: Array.isArray(data.log) ? data.log : [] });
   loadIssue = null;
   return save();
@@ -104,18 +104,21 @@ export function registerDex(c, silent = false) {
 }
 
 /* 수입 */
-export function pendingIncome() {
-  const t = now();
-  let sum = 0;
+function incomeTotal(t) {
+  let sum = G.incomeRemainder;
   for (const c of myCats()) {
     const hours = Math.min(PARAMS.incomeCapHours, Math.max(0, (t - Math.max(c.birthTime, c.incomeSince ?? c.birthTime, G.lastCollect)) / 3600e3));
     sum += incomePerHour(c) * hours;
   }
-  return Math.floor(sum);
+  return sum;
 }
+// Normalize only floating-point noise near whole-coin boundaries.
+const wholeIncome = total => Math.floor(total + Number.EPSILON * Math.max(1, total) * 4);
+export function pendingIncome() { return wholeIncome(incomeTotal(now())); }
 export function collectIncome() {
-  const n = pendingIncome();
-  G.coins += n; G.lastCollect = now(); save();
+  const t = now(), total = incomeTotal(t), n = wholeIncome(total);
+  G.incomeRemainder = Math.max(0, total - n);
+  G.coins += n; G.lastCollect = t; save();
   return n;
 }
 
