@@ -1,6 +1,6 @@
 // 3D 월드: 내 우리 + 이웃 우리 + 동물샵·교배집 건물. 플레이어가 걸어 다니며 다가가면 창이 열림.
 import * as THREE from 'three';
-import { behaviorOf } from './behavior.js';
+import { behaviorOf, chooseActivity, ACTIVITY_NAMES } from './behavior.js';
 import { buildCat, disposeCat } from './cat3d.js';
 import { toon } from './cat3d.js';
 import { addLights } from './stage.js';
@@ -208,12 +208,16 @@ export class World {
     addEventListener('keydown', (e) => k(e, true)); addEventListener('keyup', (e) => k(e, false));
     addEventListener('blur', () => { this.keys = {}; });
     this.ray = new THREE.Raycaster(); this.ndc = new THREE.Vector2();
-    let down = null;
-    this.canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
+    let down = null, lastX = 0;
+    this.canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; lastX = e.clientX; this.canvas.setPointerCapture(e.pointerId); });
+    this.canvas.addEventListener('pointermove', e => {
+      if (down && this.followCatId) { this.orbit = (this.orbit ?? 0) + (e.clientX - lastX) * .012; lastX = e.clientX; }
+    });
     this.canvas.addEventListener('pointercancel', () => { down = null; });
     this.canvas.addEventListener('pointerup', (e) => {
-      if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
-      down = null; if (!this.enabled) return;
+      const start = down; down = null;
+      if (!start || Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 6) return;
+      if (!this.enabled) return;
       this.pick(e);
     });
     addEventListener('resize', () => this.resize());
@@ -234,7 +238,7 @@ export class World {
       }
     }
     const gh = this.ray.intersectObject(this.ground)[0];
-    if (gh) this.target = new THREE.Vector3(gh.point.x, 0, gh.point.z);
+    if (gh) { this.stopWatching(); this.target = new THREE.Vector3(gh.point.x, 0, gh.point.z); }
   }
   resize() {
     const w = innerWidth, h = innerHeight;
@@ -243,7 +247,8 @@ export class World {
   }
   snapCamera() { this.camPos.set(this.player.position.x, 0, this.player.position.z); this.placeCamera(); }
   placeCamera() {
-    this.camera.position.set(this.camPos.x, 15.5, this.camPos.z + 15);
+    const distance = this.viewDistance ?? 15.5, orbit = this.followCatId ? this.orbit ?? 0 : 0;
+    this.camera.position.set(this.camPos.x + Math.sin(orbit) * distance * .97, distance, this.camPos.z + Math.cos(orbit) * distance * .97);
     this.camera.lookAt(this.camPos.x, 1, this.camPos.z - 0.5);
   }
   teleport(x, z) { this.player.position.set(x, 0, z); this.target = null; this.snapCamera(); }
@@ -265,22 +270,30 @@ export class World {
       holder.userData.catId = d.cat.id;
       this.scene.add(holder);
       const behavior = behaviorOf(d.cat);
-      this.catObjs.set(d.cat.id, { holder, root, behavior, pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * behavior.rest, tx: 0, tz: 0, moving: false, speed: behavior.speed });
+      this.catObjs.set(d.cat.id, { holder, root, behavior, personality: d.cat.personality, activity: 'idle', duration: behavior.rest,
+        pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * behavior.rest, tx: 0, tz: 0, moving: false, speed: behavior.speed });
     }
+    if (this.followCatId && !this.catObjs.has(this.followCatId)) this.stopWatching();
   }
   keyOf(c) { return [c.id, c.personality ?? 'baby', c.costume || ''].join('|'); }
   react(id, action) {
     const o = this.catObjs.get(id);
     if (!o) return;
     o.root.userData.react?.(action);
-    o.moving = false; o.wait = 5;
+    o.moving = false; o.wait = 5; o.activity = 'care';
   }
+  activityOf(id) { return ACTIVITY_NAMES[this.catObjs.get(id)?.activity] ?? ACTIVITY_NAMES.idle; }
+  focusCat(id) { if (this.catObjs.has(id)) { this.followCatId = id; this.orbit = 0; this.target = null; this.keys = {}; this.hooks.onFocus?.(id); } }
+  stopWatching() { if (!this.followCatId) return; this.followCatId = null; this.hooks.onFocus?.(null); }
 
   /* ───── 프레임 ───── */
   frame() {
     const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
     this.movePlayer(dt, t);
-    this.camPos.lerp(new THREE.Vector3(this.player.position.x, 0, this.player.position.z), 1 - Math.exp(-dt * 4));
+    const followed = this.catObjs.get(this.followCatId);
+    const anchor = followed ? followed.holder.position : this.player.position;
+    this.camPos.lerp(new THREE.Vector3(anchor.x, 0, anchor.z), 1 - Math.exp(-dt * 4));
+    this.viewDistance = THREE.MathUtils.lerp(this.viewDistance ?? 15.5, followed ? 7.5 : 15.5, 1 - Math.exp(-dt * 4));
     this.placeCamera();
     this.updateCats(dt, t);
     for (const av of this.npcAvatars) { av.userData.inner.position.y = Math.sin(t * 2 + av.position.x) * 0.03; av.userData.head.rotation.z = Math.sin(t * 1.3 + av.position.x) * 0.06; }
@@ -302,6 +315,7 @@ export class World {
     }
     const moving = dx || dz;
     if (moving) {
+      this.stopWatching();
       const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
       const sp = 6.2 * dt;
       this.tryMove(p.position, dx * sp, 0); this.tryMove(p.position, 0, dz * sp);
@@ -320,27 +334,31 @@ export class World {
   updateCats(dt, t) {
     for (const o of this.catObjs.values()) {
       const pen = this.pens[o.pen], h = o.holder, root = o.root;
-      root.userData.tick?.(t);
       const behavior = o.behavior;
       if (!o.moving) {
         o.wait -= dt;
         root.position.y = 0;
         root.rotation.z = 0;
         if (o.wait <= 0) {
-          if (Math.random() < behavior.chance) {
-            o.tx = THREE.MathUtils.lerp(pen.minX, pen.maxX, Math.random()); o.tz = THREE.MathUtils.lerp(pen.minZ, pen.maxZ, Math.random()); o.moving = true;
-          } else o.wait = behavior.rest * (0.5 + Math.random());
+          const peers = [...this.catObjs.values()].filter(p => p !== o && p.pen === o.pen).map(p => ({ x: p.holder.position.x, z: p.holder.position.z }));
+          const plan = chooseActivity(o.personality, h.position, peers, pen);
+          o.activity = plan.kind; o.duration = plan.duration;
+          o.wait = plan.duration;
+          if (plan.target) { o.tx = plan.target.x; o.tz = plan.target.z; o.moving = true; }
         }
       } else {
         const ex = o.tx - h.position.x, ez = o.tz - h.position.z, dist = Math.hypot(ex, ez);
-        if (dist < 0.15) { o.moving = false; o.wait = behavior.rest * (0.5 + Math.random()); root.position.y = 0; root.rotation.z = 0; continue; }
+        if (dist < 0.15) { o.moving = false; o.wait = o.duration; root.position.y = 0; root.rotation.z = 0; }
+        else {
         const ang = Math.atan2(ex, ez);
         let da = ang - h.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); h.rotation.y += da * Math.min(1, dt * 6);
         const step = Math.min(dist, o.speed * dt);
         h.position.x += ex / dist * step; h.position.z += ez / dist * step;
         root.position.y = Math.abs(Math.sin(t * 9 + o.speed * 10)) * behavior.bounce;
         root.rotation.z = Math.sin(t * 9 + o.speed * 10) * behavior.sway;
+        }
       }
+      root.userData.tick?.(t, { activity: o.activity, moving: o.moving, dt });
     }
   }
   checkZones() {

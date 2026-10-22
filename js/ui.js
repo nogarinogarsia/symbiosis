@@ -59,7 +59,8 @@ export function init() {
   U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => {
     if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
     else showDetail(id, true);
-  } });
+  }, onFocus: id => { $('#watchingCat').hidden = !id; $('#watchingCat').dataset.id = id ?? ''; $('#watchingLabel').textContent = id ? `${cat(id).name} 관찰 중 · ${U.world.activityOf(id)}` : ''; } });
+  $('#returnCamera').onclick = () => U.world.stopWatching();
   U.world.setupNpcs(G.npcs);
   U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.target = null; });
   document.addEventListener('visibilitychange', () => { sound.visibility(document.hidden).catch(() => toast('소리를 다시 켜 주세요')); });
@@ -160,6 +161,7 @@ function detailBox(c, t) {
   const gr = growthRemaining(c, t);
   let body = `<div class="row" style="margin-bottom:6px">${badge(c)}${personalityChip(c)}${tags(c)}</div>
     <div class="hint" style="margin-bottom:8px">${desc(c)}</div>`;
+  body += `<p class="activity-note" data-cat-activity="${c.id}">🐾 ${U.world.activityOf(c.id)}</p>`;
   if (gr > 0) {
     const p = 1 - gr / PARAMS.growthWindowMs;
     body += `<div class="row" style="justify-content:space-between"><span>🍼 성격 형성 중 (탄생 후 1시간 돌봄)</span><span data-until="${c.birthTime + PARAMS.growthWindowMs}">${fmt(gr)}</span></div>
@@ -176,6 +178,7 @@ function detailBox(c, t) {
   const cdLeft = Math.max(0, c.lastBreedAt + PARAMS.breedCooldownMs - t);
   body += '<h3>오늘의 돌봄</h3><div class="care">' + comfort(c, t).filter(a => gr <= 0 || a.id === 'clean').map(a => `<button data-act="dailycare" data-id="${c.id}" data-a="${a.id}"><span>${a.icon}</span>${a.name}<small class="hint">편안함 ${a.value}%</small></button>`).join('') + '</div><p class="hint">성장 후에도 매일 돌볼 수 있어요. 편안함은 성격·유전·교배 확률에 영향을 주지 않아요.</p>';
   body += `<div class="row" style="margin-top:10px">`
+    + `<button class="btn sm" data-act="focuscat" data-id="${c.id}">🔎 월드에서 보기</button>`
     + `<button class="btn sm" data-act="detail" data-id="${c.id}">🧬 유전자·가계도</button>`
     + `<button class="btn sm peach" data-act="gobreed" data-id="${c.id}" ${gr > 0 ? 'disabled' : ''}>💞 교배하기</button>`
     + `<button class="btn sm gray" data-act="sell" data-id="${c.id}">판매 ${sellPrice(c)}🐾</button></div>`
@@ -363,6 +366,7 @@ function onClick(e) {
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'focuscat': U.world.focusCat(d.id); closePanel(); break;
     case 'dailycare': {
       const r = careDaily(d.id, d.a);
       if (r.ok) { fx(r.fx); sound.play(d.a); U.world.react(d.id, d.a); } else toast(r.msg);
@@ -432,6 +436,9 @@ function everySecond() {
   updateClock();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   const t = now();
+  document.querySelectorAll('[data-cat-activity]').forEach(el => { el.textContent = '🐾 ' + U.world.activityOf(el.dataset.catActivity); });
+  const watchedId = $('#watchingCat').dataset.id;
+  if (watchedId && cat(watchedId)) $('#watchingLabel').textContent = `${cat(watchedId).name} 관찰 중 · ${U.world.activityOf(watchedId)}`;
   if (changed || shopRefreshAt !== G.shopRefreshAt) { stageKey = ''; render(); return; }
   document.querySelectorAll('[data-until]').forEach((el) => {
     const left = +el.dataset.until - t;
