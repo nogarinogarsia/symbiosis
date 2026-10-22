@@ -2,7 +2,7 @@
 import { RNG, hashSeed } from './rng.js';
 import { hexToRgb, mix, FANTASY_PALETTE } from './appearance.js';
 
-const SIZES = { body: [256, 128], head: [256, 128], legs: [128, 64], tail: [256, 64], ears: [32, 32] };
+const SIZES = { body: [256, 128], head: [256, 128], legs: [128, 64], thigh: [128, 64], tail: [256, 64], ears: [32, 32] };
 const cache = new Map();
 
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -26,23 +26,37 @@ function stripeLayer(part, app, W, H, rng) {
     }
   };
   if (part === 'body') {
+    // 몸통 구형의 극을 앞뒤(z)축에 맞춰 두었으므로: 등(척추)은 u=0.75(x=0.75W), 옆구리는 x=0.5W·W, 배는 x=0.25W.
+    // 줄무늬 = 등의 척추선에서 양쪽 옆구리로 내려오다 배 전에 끝나는 가로줄, 몸 길이(y)를 따라 균일 간격
+    const spine = 0.75 * W;
+    g.lineWidth = 6; g.beginPath(); g.moveTo(spine, 0); g.lineTo(spine, H); g.stroke();
     if (!classic) {
-      // 고등어태비: 척추선 + 등에서 옆구리로 내려오는 가는 줄 (배는 비워 둠)
-      const N = 24;
+      const N = 13;
       for (let i = 0; i < N; i++) {
-        const x = (i + 0.5 + rng.range(-0.18, 0.18)) / N * W;
-        taper(x, H * 0.06, H * rng.range(0.34, 0.6), rng.range(3.6, 5), rng.range(-1, 1));
+        const y = H * (0.07 + 0.86 * (i + 0.5) / N) + rng.range(-1.5, 1.5);
+        const len = W * rng.range(0.17, 0.22);
+        for (const dir of [-1, 1]) {
+          const n = 6;
+          for (let k = 0; k < n; k++) {
+            g.lineWidth = Math.max(1.5, 6 * (1 - k / n * 0.8));
+            g.beginPath();
+            g.moveTo(spine + dir * len * (k / n), y + Math.sin(k * 0.9 + i) * 0.8);
+            g.lineTo(spine + dir * len * ((k + 1) / n), y + Math.sin((k + 1) * 0.9 + i) * 0.8);
+            g.stroke();
+          }
+        }
       }
-      g.lineWidth = 5; g.beginPath(); g.moveTo(0, H * 0.04); g.lineTo(W, H * 0.04); g.stroke();
     } else {
-      // 클래식태비: 옆구리의 소용돌이(불스아이) + 굵은 척추선 + 어깨 줄
+      // 클래식태비: 옆구리의 소용돌이(불스아이) + 굵은 척추선 + 등에서 내려오는 굵은 줄
       for (const cx of [0.5 * W, 0.0, W]) {
         g.lineWidth = 6;
-        for (let r = 0; r < 2; r++) { g.beginPath(); g.ellipse(cx, H * 0.42, 8 + r * 15, 13 + r * 18, 0, 0, Math.PI * 2); g.stroke(); }
-        g.lineWidth = 3; g.beginPath(); g.arc(cx, H * 0.42, 2.5, 0, Math.PI * 2); g.stroke();
-        for (const dx of [-1, 1]) taper(cx + dx * 40, H * 0.06, H * 0.5, 7, dx * 0.6);
+        for (let r = 0; r < 2; r++) { g.beginPath(); g.ellipse(cx, H * 0.5, 13 + r * 17, 9 + r * 12, 0, 0, Math.PI * 2); g.stroke(); }
+        g.beginPath(); g.arc(cx, H * 0.5, 2.5, 0, Math.PI * 2); g.stroke();
       }
-      g.lineWidth = 8; g.beginPath(); g.moveTo(0, H * 0.04); g.lineTo(W, H * 0.04); g.stroke();
+      g.lineWidth = 10; g.beginPath(); g.moveTo(spine, 0); g.lineTo(spine, H); g.stroke();
+      for (const y of [0.12, 0.26, 0.74, 0.88]) for (const dir of [-1, 1]) {
+        g.lineWidth = 6; g.beginPath(); g.moveTo(spine, H * y); g.lineTo(spine + dir * W * 0.2, H * y); g.stroke();
+      }
     }
   } else if (part === 'head') {
     const fx = W * 0.25;
@@ -58,7 +72,7 @@ function stripeLayer(part, app, W, H, rng) {
     for (const s of [-1, 1]) for (let k = 0; k < 2; k++) {
       g.beginPath(); g.moveTo(fx + s * 36, H * (0.55 + k * 0.08)); g.quadraticCurveTo(fx + s * 54, H * (0.58 + k * 0.1), fx + s * 74, H * (0.55 + k * 0.1)); g.stroke();
     }
-  } else if (part === 'legs') {
+  } else if (part === 'legs' || part === 'thigh') {
     g.lineWidth = 5;
     for (let k = 0; k < 3; k++) { const y = H * (0.14 + k * 0.22); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
   } else if (part === 'tail') {
@@ -72,17 +86,18 @@ function stripeLayer(part, app, W, H, rng) {
 function whiteLayer(part, app, W, H, rng) {
   const lv = app.white === 'none' ? 0 : app.white === 'bicolor' ? 1 : 2;
   const c = canvas(W, H), g = c.getContext('2d');
-  if (lv === 0 || part === 'ears') return null;
+  if (lv === 0 || part === 'ears' || (part === 'thigh' && lv === 1)) return null;
   g.fillStyle = '#000';
   const blob = (x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, rx, ry, rng.range(-0.4, 0.4), 0, Math.PI * 2); g.fill(); };
   if (part === 'body') {
     if (lv === 1) {
-      g.fillRect(0, H * 0.66, W, H * 0.34); blob(W * 0.25, H * 0.5, W * 0.09, H * 0.3);
-      for (let i = 0; i < rng.int(3); i++) blob(rng.range(0, W), rng.range(H * 0.25, H * 0.6), W * 0.06, H * 0.12);
+      g.fillRect(W * 0.07, 0, W * 0.36, H);                // 배(x=0.25W 주변)
+      blob(W * 0.25, H * 0.08, W * 0.16, H * 0.14);        // 가슴
+      for (let i = 0; i < rng.int(3); i++) blob(rng.range(0.6 * W, 0.95 * W), rng.range(H * 0.15, H * 0.85), W * 0.05, H * 0.1);
     } else {
       g.fillRect(0, 0, W, H);
       g.globalCompositeOperation = 'destination-out';
-      for (let i = 0; i < 2 + rng.int(3); i++) blob(rng.range(0.35 * W, 0.95 * W), rng.range(0, H * 0.35), W * rng.range(0.05, 0.11), H * rng.range(0.1, 0.2));
+      for (let i = 0; i < 2 + rng.int(3); i++) blob(0.75 * W + rng.range(-0.1, 0.1) * W, rng.range(H * 0.1, H * 0.9), W * rng.range(0.05, 0.1), H * rng.range(0.1, 0.2));
     }
   } else if (part === 'head') {
     if (lv === 1) { blob(W * 0.25, H * 0.72, W * 0.1, H * 0.2); if (rng.chance(0.5)) { g.fillRect(W * 0.25 - 5, H * 0.1, 10, H * 0.5); } }
@@ -91,7 +106,7 @@ function whiteLayer(part, app, W, H, rng) {
       blob(W * 0.07, H * 0.2, W * 0.1, H * 0.18); blob(W * 0.43, H * 0.2, W * 0.1, H * 0.18); blob(W * 0.75, H * 0.15, W * 0.2, H * 0.3);
       if (rng.chance(0.5)) blob(W * 0.19, H * 0.5, W * 0.05, H * 0.1);
     }
-  } else if (part === 'legs') {
+  } else if (part === 'legs' || part === 'thigh') {
     if (lv === 1) g.fillRect(0, H * 0.55, W, H * 0.45); else g.fillRect(0, 0, W, H);
   } else if (part === 'tail') {
     if (lv === 1) g.fillRect(W * 0.8, 0, W * 0.2, H); else { g.fillRect(W * 0.25, 0, W * 0.75, H); }

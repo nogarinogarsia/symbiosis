@@ -48,6 +48,7 @@ export function buildCat(cat, opts = {}) {
   const matLegs = toon(0xffffff, { map: tex.legs });
   const matTail = toon(0xffffff, { map: tex.tail });
   const matEars = toon(0xffffff, { map: tex.ears });
+  const matThigh = toon(0xffffff, { map: tex.thigh });
 
   const wK = (long ? 0.76 : 0.55) * (0.88 + 0.5 * b.bulk);
   const hK = long ? 0.7 : 0.62;
@@ -56,13 +57,14 @@ export function buildCat(cat, opts = {}) {
   const fw = 0.95 + 0.3 * b.face + (long ? 0.1 : 0);
 
   // 몸통
-  const body = addPart(rig, sphere(), matBody, { pos: [0, 0.62, 0], scale: [wK, hK, dK] });
+  const bodyGeo = sphere(); bodyGeo.rotateX(Math.PI / 2); // 극을 앞뒤축으로: 등 중앙선을 따라 줄무늬가 균일하게 배열
+  const body = addPart(rig, bodyGeo, matBody, { pos: [0, 0.62, 0], scale: [wK, hK, dK] });
   // 다리 / 엉덩이
   const legGeo = new THREE.CapsuleGeometry(0.11, 0.32, 6, 12);
   for (const s of [-1, 1]) {
     addPart(rig, legGeo, matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.32, 0.5] });
     addPart(rig, sphere(), matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.08, 0.58], scale: [0.14, 0.09, 0.19], outline: 0.02 });
-    addPart(rig, sphere(), matBody, { pos: [s * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44], outline: 0.026 });
+    addPart(rig, sphere(), matThigh, { pos: [s * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44], outline: 0.026 });
     addPart(rig, sphere(), matLegs, { pos: [s * wK * 0.7, 0.08, 0.2], scale: [0.14, 0.09, 0.22], outline: 0.02 });
   }
 
