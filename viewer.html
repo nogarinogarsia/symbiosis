@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>고양이 렌더 확인</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<style>body{margin:0;background:linear-gradient(#fdf1d8,#f7dcc0);font:13px system-ui;color:#4a3b2a}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;padding:10px}
+.c{background:#fff8;border-radius:14px;padding:4px;text-align:center}.c img{width:100%}</style></head>
+<body><div id="grid"></div>
+<script type="module">
+import { createFounder, refreshCat, phenotypeName, COSTUMES } from './js/engine.js';
+import { thumbnail } from './js/stage.js';
+const g = document.getElementById('grid');
+const q = new URLSearchParams(location.search);
+const list = [];
+for (let i = 0; i < 24; i++) list.push(createFounder('view' + i, { specialChance: 0 }));
+const over = (genes, extra = {}) => { const c = createFounder('x' + JSON.stringify(genes), { specialChance: 0, sex: 'F', personality: extra.p ?? 0 }); Object.assign(c.genome, genes); const r = refreshCat({ ...c, ...extra }); return r; };
+list.push(over({ O: ['O', 'o'], S: ['S', 'S'] }, { p: 1 }));
+list.push(over({ O: ['O', 'o'], S: ['S', 's'], L: ['l', 'l'] }, { p: 2 }));
+list.push(over({ C: ['cs', 'cs'], L: ['l', 'l'] }, { p: 3 }));
+list.push(over({ A: ['A', 'A'], T: ['m', 'm'], B: ['b', 'b'] }, { p: 4 }));
+list.push(over({ I: ['I', 'i'], A: ['A', 'a'] }, { p: 5 }));
+for (const s of ['sphynx', 'manx', 'curl', 'singapura']) list.push(over({}, { special: s, p: 6 }));
+for (const f of ['mint', 'galaxy', 'holo', 'aurora']) list.push(over({}, { fantasy: f, p: 7 }));
+COSTUMES.forEach((c, i) => list.push(over({ L: i % 2 ? ['l', 'l'] : ['L', 'L'] }, { costume: c.id, p: i % 8 })));
+list.push(refreshCat({ ...over({}, { p: null }), personality: null }));
+for (const c of list) {
+  const d = document.createElement('div'); d.className = 'c';
+  d.innerHTML = `<img src="${thumbnail(c, 190)}"><div>${c.name} ${c.sex === 'M' ? '♂' : '♀'} P${c.personality}<br><small>${c.special || c.fantasy || c.costume || phenotypeName(c.ph)}</small></div>`;
+  g.appendChild(d);
+}
+document.title = 'ready';
+</script></body></html>

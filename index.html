@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>냥냥 유전 하우스</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="brand"><span class="paw">🐾</span> 냥냥 유전 하우스 <small>prototype</small></div>
+    <div class="clock" id="clock"></div>
+    <div class="top-right">
+      <button class="pill income" id="btnIncome">🐾 수입 받기 <b id="incomeAmt">0</b></button>
+      <div class="pill coins">🐾 <b id="coins">0</b></div>
+      <div class="dev"><button class="mini" data-dev="1h">+1시간</button><button class="mini" data-dev="1d">+1일</button><button class="mini warn" data-dev="reset">새 게임</button></div>
+    </div>
+  </header>
+  <main>
+    <section id="stageWrap"><canvas id="stage"></canvas><div id="stageHud"></div><div id="fxLayer"></div></section>
+    <aside id="panel"></aside>
+  </main>
+  <nav id="tabs">
+    <button data-tab="home"><span>🏠</span>우리집</button>
+    <button data-tab="breed"><span>💞</span>교배</button>
+    <button data-tab="dex"><span>📖</span>도감</button>
+    <button data-tab="shop"><span>🛍️</span>동물샵</button>
+    <button data-tab="npc"><span>🏘️</span>이웃</button>
+  </nav>
+  <div id="toasts"></div>
+  <div id="modal" hidden></div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
