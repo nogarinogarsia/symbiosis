@@ -46,6 +46,42 @@ try {
     click('#tabs [data-tab="home"]');
     assert(!$('#panel').hidden && $('#panel').textContent.includes('고양이 4마리'), '우리집 렌더');
   });
+  await check('고양이 카드 네이티브 버튼·선택 상태·재렌더 후 초점', () => {
+    const card=$('#panel [data-act="select"]');
+    assert(card.tagName==='BUTTON', '고양이 카드 키보드 조작');
+    card.focus();const id=card.dataset.id;card.click();
+    assert(document.activeElement.dataset.id===id && document.activeElement.dataset.act==='select', '선택 후 초점 유지');
+    assert(document.activeElement.getAttribute('aria-pressed')==='true', '고양이 선택 상태 전달');
+    assert($('#tabs [data-tab="home"]').getAttribute('aria-expanded')==='true','패널 열림 상태');
+  });
+  await check('상세 대화창 초점 격리·순환·Escape 복귀', () => {
+    const opener=$('#panel [data-act="detail"]');opener.focus();opener.click();
+    const dialog=$('#modal .dialog');
+    assert(dialog.contains(document.activeElement) && $('#tabs').inert && $('#panel').inert, '대화창 초점 격리');
+    assert(dialog.getAttribute('aria-labelledby')==='dialogTitle' && $('#dialogTitle').textContent, '대화창 제목');
+    const close=$('#modal [data-act="close"]');close.focus();
+    close.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+    assert(dialog.contains(document.activeElement),'Tab 초점 순환');
+    close.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+    assert($('#modal').hidden && !$('#panel').hidden && !$('#panel').inert,'Escape는 상세 창만 닫기');
+    assert(document.activeElement===opener,'대화창을 연 버튼으로 초점 복귀');
+  });
+  await check('판매·새 게임 확인 취소에 진행 보존', () => {
+    const ids=[...game.G.mine],coins=game.G.coins;
+    click('#panel [data-act="sell"]');
+    assert($('#modal h2').textContent==='고양이 판매','판매 확인 표시');
+    click('#modal [data-act="close"]');
+    assert(JSON.stringify(game.G.mine)===JSON.stringify(ids) && game.G.coins===coins,'판매 취소');
+    click('[data-dev="reset"]');
+    assert($('#modal h2').textContent==='새 게임 시작','새 게임 확인 표시');
+    const cancel=$('#modal [data-act="close"]'),confirm=$('#modal [data-act="confirm"]');
+    cancel.focus();cancel.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
+    assert(document.activeElement===confirm,'Shift+Tab은 마지막 확인 버튼으로 순환');
+    confirm.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+    assert(document.activeElement===cancel,'Tab은 첫 취소 버튼으로 순환');
+    click('#modal [data-act="close"]');
+    assert(JSON.stringify(game.G.mine)===JSON.stringify(ids) && game.G.coins===coins,'새 게임 취소');
+  });
   await check('성묘 돌봄 클릭·저장 반영', () => {
     const id = U.sel;
     click('#panel [data-act="dailycare"][data-a="feed"]');
@@ -55,6 +91,7 @@ try {
   });
   await check('교배 후보 선택·부모 슬롯·실행 가능 상태', () => {
     click('#tabs [data-tab="breed"]');
+    assert([...$('#panel').querySelectorAll('.slot')].every(slot=>slot.tagName==='BUTTON'),'부모 슬롯 키보드 조작');
     click('#panel [data-act="pick"]:not(.dis)');
     click('#panel [data-act="pick"]:not(.dis)');
     assert(U.breed.father && U.breed.mother && !$('#panel [data-act="dobreed"]').disabled, '부모 선택');
@@ -79,11 +116,18 @@ try {
     U.stage.frame();
     assert(U.stage.renderer.info.render.frame === frame, '숨겨진 무대 렌더');
   });
-  await check('도감 검색 이벤트→빈 결과→검색 해제', () => {
+  await check('한글 조합 보호·실시간 검색 초점 유지→검색 해제', async () => {
     click('#tabs [data-tab="dex"]');
-    const input = $('#dexSearch'); input.value = 'no-result-smoke-xyz';
-    input.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}));
+    const input = $('#dexSearch'); input.focus();input.value = 'no-result-smoke-xyz';
+    input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));
+    input.dispatchEvent(new InputEvent('input', {bubbles:true,isComposing:true}));
+    const compositionStart=performance.now();
+    await waitUntil(()=>performance.now()-compositionStart>220);
+    assert(input.isConnected && $('#panel').querySelectorAll('.card').length>=4,'조합 중 화면 재생성 방지');
+    input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}));
+    await waitUntil(()=>$('#panel').querySelectorAll('.card').length===0);
     assert($('#panel').querySelectorAll('.card').length === 0, '검색 결과 비우기');
+    assert(document.activeElement.id==='dexSearch','실시간 검색 입력 초점 유지');
     $('#dexSearch').value = ''; $('#dexSearch').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}));
     assert($('#panel').querySelectorAll('.card').length >= 4, '검색 해제');
   });
@@ -91,6 +135,16 @@ try {
     click('#tabs [data-tab="home"]'); click('#panel [data-act="focuscat"]');
     assert(U.world.followCatId === U.sel && !$('#watchingCat').hidden, '고양이 관찰');
     click('#returnCamera'); assert(!U.world.followCatId && $('#watchingCat').hidden, '관찰 종료');
+  });
+  await check('이웃 카드 상세·교환 버튼 분리와 교환 취소', () => {
+    click('#tabs [data-tab="npc"]');
+    assert($('#panel').querySelectorAll('article.card .card-main').length===15,'이웃 상세 버튼');
+    assert($('#panel').querySelectorAll('button button').length===0,'버튼 중첩 방지');
+    const mine=[...game.G.mine];click('#panel [data-act="trade"]');
+    assert($('#modal').querySelectorAll('button[data-act="dotrade"]').length===mine.length,'키보드로 고를 수 있는 교환 후보');
+    click('#modal [data-act="close"]');
+    assert(JSON.stringify(game.G.mine)===JSON.stringify(mine),'교환 취소 진행 유지');
+    click('#tabs [data-tab="npc"]');
   });
   await check('시간 이동→성장 확정·월드 청소 오브젝트 생성', () => {
     click('[data-dev="1d"]');
@@ -154,6 +208,15 @@ try {
       assert(second.userData.textureSet.body!==texture, '완전 해제 후 새 텍스처 생성');
       assert(second.userData.textureSet.body.image.toDataURL()===pixels, '토티 패치 재생성 일관성');
     } finally {if(first)disposeCat(first);if(second)disposeCat(second);}
+  });
+  await check('명시적 판매·새 게임 확인 시에만 상태 변경', () => {
+    click('#tabs [data-tab="home"]');
+    const soldId=U.sel,before=game.G.mine.length;
+    click('#panel [data-act="sell"]');click('#modal [data-act="confirm"]');
+    assert(game.G.mine.length===before-1 && !game.G.mine.includes(soldId),'판매 확인 실행');
+    click('[data-dev="reset"]');click('#modal [data-act="confirm"]');
+    assert(game.G.mine.length===4 && game.G.offset===0 && !U.breed.father && !U.breed.mother,'새 게임 확인 실행');
+    assert(JSON.parse(memory.getItem('catgene-save-v1')).mine.length===4,'새 게임 저장');
   });
   await check('실제 브라우저 저장 원본 보존', () => {
     assert(originalStorage.getItem('catgene-save-v1') === originalSave, '원래 게임 진행이 변경되었습니다');
