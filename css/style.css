@@ -42,12 +42,13 @@ h3{margin:14px 0 8px;font-size:16px;font-weight:normal;color:var(--ink2)}
 #tabs button.on{background:var(--peach);color:#fff;border-color:#fff;box-shadow:0 5px 0 var(--peach-d)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:10px}
 .card{background:#fff;border:3px solid var(--line);border-radius:22px;padding:8px;text-align:center;cursor:pointer;position:relative;transition:.12s;font-size:14px}
-.card:hover{transform:translateY(-2px);border-color:var(--leaf)}
+.card:not(:disabled):hover{transform:translateY(-2px);border-color:var(--leaf)}
 .card.sel{border-color:var(--peach);background:#fff3ea;box-shadow:0 0 0 3px #fbd5c5}
 .card.dis{opacity:.5}
 .card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;border-radius:14px;background:radial-gradient(circle,#fff6e3,#fdeccd)}
 .card .nm{margin-top:4px;font-size:15px}
 .card .meta{font-size:12px;color:var(--ink2);min-height:16px}
+.card > span,.card-main > span,.slot > span{display:block}.card-main{display:block;width:100%;padding:0;border:0;background:transparent;font:inherit}.card-main:focus-visible{border-radius:14px}.slot img{display:block;margin:auto}
 .badge{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;color:#fff;margin:2px 1px}
 .sex{font-size:13px}
 .m{color:#6bb0e6}.f{color:#f088a8}
@@ -114,3 +115,28 @@ body{overflow:hidden}
   #top{padding:8px 10px;gap:8px}.pill{font-size:13px;padding:4px 10px}
   #panel{left:8px;right:8px;width:auto;top:56px;bottom:96px}
 }
+
+#tabs{display:flex;max-width:calc(100vw - 12px);width:max-content;gap:5px}
+#tabs button{min-width:0;padding:8px 14px;white-space:nowrap}
+button:focus-visible,input:focus-visible{outline:3px solid #397f84;outline-offset:3px}
+.dex-search{display:block;margin:12px 0;color:var(--ink2)}
+#panel a{color:#426d5a;text-underline-offset:3px}
+.dex-search input{display:block;width:100%;margin-top:6px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;font:inherit;box-sizing:border-box;background:#fffdf8;color:var(--ink)}
+.recovery{position:fixed;inset:0;z-index:100;background:#e8eedf;display:grid;place-items:center;padding:20px}.recovery .dialog{box-sizing:border-box}.recovery p{line-height:1.7}
+.activity-note{padding:7px 10px;border-radius:12px;background:#edf3e5;color:#58724c;font-size:13px}
+#watchingCat{position:fixed;top:105px;left:50%;transform:translateX(-50%);z-index:10;padding:8px 14px;background:#fffaf0ed;border:3px solid white;border-radius:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 38px);box-sizing:border-box;font-size:13px}#watchingCat[hidden]{display:none}#watchingCat small{font-size:11px;color:var(--ink2)}
+@media(max-width:760px){#watchingCat{top:62px;gap:6px;min-width:280px}#watchingCat small{display:none}}
+#touchStick{display:none;position:fixed;left:22px;bottom:116px;width:116px;height:116px;border-radius:50%;border:3px solid #fff9;background:#fff6;z-index:11;touch-action:none;user-select:none;box-sizing:border-box}
+#touchStick[hidden]{display:none!important}.stick-knob{position:absolute;left:31px;top:31px;width:48px;height:48px;border-radius:50%;background:#ffffffe8;box-shadow:0 3px 10px #59725840;border:2px solid #c4d5ad;box-sizing:border-box;pointer-events:none}.stick-caption{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:11px;color:#506d4e;pointer-events:none}
+@media(pointer:coarse){#touchStick{display:block}}
+@media(max-width:760px){#touchStick{display:block}.pill.sound{padding:4px 7px;min-width:30px}.brand{white-space:nowrap;font-size:13px}#top{gap:4px}.top-right{gap:3px}}
+@media(max-width:760px){
+  #tabs{bottom:max(6px,env(safe-area-inset-bottom));gap:3px}
+  #tabs button{padding:7px 9px;font-size:12px}
+  #tabs button span{font-size:22px}
+  .dialog{padding:14px;border-radius:22px;max-height:85dvh}
+  #panel{bottom:100px;max-height:calc(100dvh - 160px)}
+  .top-right{gap:4px}.pill{font-size:11px;padding:4px 6px}
+  .care{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){.fx,.toast,.dialog{animation:none!important}}

@@ -1,9 +1,13 @@
-import { G, load, newGame, tick, save } from './game.js';
-import { init, U } from './ui.js';
+import { G, load, newGame, tick, save, loadIssue } from './game.js';
+import { showRecovery } from './recovery.js';
 
-if (!load() || !Object.keys(G.cats).length || !G.mine.length) newGame();
-tick();
-save();
-init();
-window.__game = G; // 디버깅용
-window.__ui = U;
+async function start() {
+  tick(); save();
+  const { init, U } = await import('./ui.js');
+  init();
+  window.__game = G; // 디버깅용
+  window.__ui = U;
+}
+if (load()) await start();
+else if (loadIssue) showRecovery(start);
+else { newGame(); await start(); }

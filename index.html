@@ -16,6 +16,7 @@
   <div class="brand"><span class="paw">🐾</span> 냥냥 유전 하우스 <small>prototype</small></div>
   <div class="clock" id="clock"></div>
   <div class="top-right">
+    <button class="pill sound" id="btnSound" aria-label="소리 켜기" aria-pressed="false" title="소리 켜기">🔇</button>
     <button class="pill income" id="btnIncome">🐾 수입 받기 <b id="incomeAmt">0</b></button>
     <div class="pill coins">🐾 <b id="coins">0</b></div>
     <div class="dev"><button class="mini" data-dev="1h">+1시간</button><button class="mini" data-dev="1d">+1일</button><button class="mini warn" data-dev="reset">새 게임</button></div>
@@ -23,14 +24,20 @@
 </header>
 <div id="hint">🕹️ WASD·방향키 또는 클릭으로 이동 · 고양이를 클릭하면 돌보기 · 🛍️동물샵 / 💞교배집 / 이웃 우리에 다가가 보세요</div>
 <aside id="panel" hidden></aside>
+<div id="watchingCat" hidden><span id="watchingLabel"></span><button id="returnCamera" class="btn sm gray">집사에게 돌아가기</button><small>화면을 드래그하면 회전해요</small></div>
 <div id="fxLayer"></div>
+<div id="touchStick" aria-label="터치 이동 조이스틱"><span class="stick-knob"></span><span class="stick-caption">이동</span></div>
 <nav id="tabs">
   <button data-tab="home"><span>🐱</span>내 고양이</button>
+  <button data-tab="breed"><span>💞</span>교배</button>
+  <button data-tab="shop"><span>🛍️</span>동물샵</button>
+  <button data-tab="npc"><span>🏘️</span>이웃</button>
   <button data-tab="dex"><span>📖</span>도감</button>
 </nav>
 <div id="breedOverlay" hidden><canvas id="breedCanvas"></canvas><div class="cap">두근두근… 💞</div></div>
-<div id="toasts"></div>
+<div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 <div id="modal" hidden></div>
+<input type="file" id="saveFile" accept="application/json,.json" hidden>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildCat, toon } from './cat3d.js';
+import { buildCat, toon, disposeCat } from './cat3d.js';
 
 export function addLights(scene) {
   scene.add(new THREE.HemisphereLight(0xfff3e0, 0xd9b99b, 1.05));
@@ -54,7 +54,7 @@ export class Stage {
     this.wide = w / h;
   }
   clear() {
-    for (const o of [...this.cats.map((c) => c.root), ...this.extras]) this.scene.remove(o);
+    for (const o of [...this.cats.map((c) => c.root), ...this.extras]) { this.scene.remove(o); disposeCat(o); }
     this.cats = []; this.extras = []; this.anim = null; this.spin = 0;
   }
   addCat(cat, x = 0, z = 0, face = 0) {
@@ -73,6 +73,7 @@ export class Stage {
     this.camera.position.set(0, 2.1, 9.2); this.camera.lookAt(0, 0.85, 0);
   }
   frame() {
+    if (document.hidden || this.canvas.closest('[hidden]')) return;
     const t = this.clock.getElapsedTime();
     for (const c of this.cats) {
       c.root.userData.tick?.(t);
@@ -148,13 +149,15 @@ export function thumbnail(cat, size = 180) {
   }
   thumbR.setSize(size, size, false);
   thumbCam.position.set(0, 1.6, 5.6); thumbCam.lookAt(0, 0.95, 0);
-  const root = buildCat({ ...cat, personality: cat.personality ?? 3 });
+  const root = buildCat(cat);
   root.rotation.y = 0.35;
   root.userData.tick?.(0.2);
-  thumbScene.add(root);
-  thumbR.render(thumbScene, thumbCam);
-  const url = thumbR.domElement.toDataURL('image/png');
-  thumbScene.remove(root);
+  let url;
+  try {
+    thumbScene.add(root);
+    thumbR.render(thumbScene, thumbCam);
+    url = thumbR.domElement.toDataURL('image/png');
+  } finally { thumbScene.remove(root); disposeCat(root); }
   if (thumbCache.size > 400) thumbCache.delete(thumbCache.keys().next().value);
   thumbCache.set(key, url);
   return url;

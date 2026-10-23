@@ -1,13 +1,21 @@
 import { Stage, thumbnail } from './stage.js';
 import { World } from './world.js';
 import { G, now, cat, myCats, shopCats, tick, care, sell, trade, doBreed, checkBreed, breedCost, sourceOf, collectIncome,
-  pendingIncome, skipTime, reset, dexTotals, save } from './game.js';
+  pendingIncome, skipTime, reset, dexTotals, save, exportSave, importSave, saveError } from './game.js';
 import { phenotypeName, gradeLabel, sellPrice, shopBreedPrice, incomePerHour, canBreed, SPECIALS, FANTASY, COSTUMES, COLOR_KO, TYR_KO, isForbiddenPair } from './engine.js';
 import { PERSONALITIES, CARE_ACTIONS, careCooldown, growthRemaining } from './personality.js';
 import { GRADES, GRADE_COLORS, PARAMS } from './params.js';
+import { comfort, litterState } from './wellbeing.js';
+import { careDaily } from './game.js';
+import { bindTouchControls } from './touch-controls.js';
+import { sound } from './audio.js';
+import { trapDialogFocus, rememberPanelFocus } from './focus.js';
 
 const $ = (s) => document.querySelector(s);
-const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, world: null, open: false, npc: null, dexPage: 1, dexGrade: -1, busy: false };
+const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const U = { tab: 'home', sel: null, breed: { father: null, mother: null, slot: 'father', src: 'mine' }, stage: null, world: null, open: false, npc: null, dexPage: 1, dexGrade: -1, dexSearch: '', busy: false };
+let dexSearchTimer = null;
+let dexComposing = false;
 export { U };
 
 /* ───── 공통 헬퍼 ───── */
@@ -43,19 +51,76 @@ function tags(c) {
   if (c.costume) t.push(`<span class="chip">👒 ${COSTUMES.find((x) => x.id === c.costume).name}</span>`);
   return t.join('');
 }
-function card(c, { sel = false, dis = false, meta = '', attr = '' } = {}) {
-  return `<div class="card ${sel ? 'sel' : ''} ${dis ? 'dis' : ''}" ${attr}>
-    <img src="${thumbnail(c, 130)}" alt=""><div class="nm">${c.name} ${sexIcon(c)}</div>
-    <div>${badge(c)}</div><div class="meta">${meta}</div></div>`;
+function card(c, { sel = false, dis = false, meta = '', attr = '', actions = '' } = {}) {
+  const content = `<img src="${thumbnail(c, 130)}" alt=""><span class="nm">${c.name} ${sexIcon(c)}</span><span>${badge(c)}</span><span class="meta">${meta}</span>`;
+  const selection = /data-act="(select|pick)"/.test(attr) ? `aria-pressed="${sel}"` : '';
+  if (actions) return `<article class="card"><button type="button" class="card-main" ${attr}>${content}</button><div class="meta">${actions}</div></article>`;
+  return `<button type="button" class="card ${sel ? 'sel' : ''} ${dis ? 'dis' : ''}" ${attr} ${selection} ${dis ? 'disabled' : ''}>${content}</button>`;
 }
 const desc = (c) => (c.special ? `${SPECIALS[c.special]} · ` : '') + (c.fantasy ? `${FANTASY[c.fantasy]} · ` : '') + phenotypeName(c.ph);
+const litterSummary = state => state.total ? `🧹 화장실 청소 ${state.total}개 · 우리 안 화장실을 클릭하거나 아래 청소 버튼을 눌러 주세요.` : '✨ 우리 안 화장실이 깨끗해요.';
 
 /* ───── 렌더 ───── */
 export function init() {
-  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => { U.sel = id; openPanel('home'); } });
+  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => {
+    if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
+    else showDetail(id, true);
+  }, onFocus: id => { $('#watchingCat').hidden = !id; $('#watchingCat').dataset.id = id ?? ''; $('#watchingLabel').textContent = id ? `${cat(id).name} 관찰 중 · ${U.world.activityOf(id)}` : ''; }, onClean: id => {
+    const result = careDaily(id, 'clean');
+    if (result.ok) { sound.play('clean'); fx('🧹'); toast(`${cat(id).name}의 화장실을 치웠어요`); render(); }
+    else toast(result.msg);
+  } });
+  $('#returnCamera').onclick = () => U.world.stopWatching();
   U.world.setupNpcs(G.npcs);
+  U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.target = null; });
+  document.addEventListener('visibilitychange', () => { sound.visibility(document.hidden).catch(() => toast('소리를 다시 켜 주세요')); });
+  $('#btnSound').onclick = async () => {
+    const button = $('#btnSound'); button.disabled = true;
+    try {
+      const enabled = await sound.setEnabled(!sound.enabled);
+      button.textContent = enabled ? '🔊' : '🔇'; button.setAttribute('aria-pressed', String(enabled));
+      button.setAttribute('aria-label', enabled ? '소리 끄기' : '소리 켜기'); button.title = enabled ? '소리 끄기' : '소리 켜기';
+    } catch (err) { toast(err.message); }
+    finally { button.disabled = false; }
+  };
   document.addEventListener('click', onClick);
-  $('#btnIncome').onclick = () => { const n = collectIncome(); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
+  document.addEventListener('input', e => {
+    if (e.target.id === 'dexSearch') {
+      U.dexSearch = e.target.value; U.dexPage = 1; clearTimeout(dexSearchTimer);
+      if (e.isComposing || dexComposing) return;
+      dexSearchTimer = setTimeout(() => { if (U.open && U.tab === 'dex') render(); }, 180);
+    }
+  });
+  document.addEventListener('compositionstart', e => { if (e.target.id === 'dexSearch') { dexComposing = true; clearTimeout(dexSearchTimer); } });
+  document.addEventListener('compositionend', e => { if (e.target.id === 'dexSearch') { dexComposing = false; e.target.dispatchEvent(new Event('input', {bubbles:true})); } });
+  document.addEventListener('keydown', e => {
+    if (e.target.id === 'dexSearch' && e.key === 'Enter' && !e.isComposing && !dexComposing) { clearTimeout(dexSearchTimer); U.dexSearch = e.target.value; U.dexPage = 1; render(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (!$('#modal').hidden) {
+      trapDialogFocus(e, $('#modal .dialog'));
+      if (e.key === 'Escape' && !U.busy) { e.preventDefault(); closeModal(); }
+    } else if (e.key === 'Escape' && !U.busy && U.open) { e.preventDefault(); closePanel(); }
+  });
+  $('#saveFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error('10MB 이하의 저장 파일을 골라 주세요');
+      const raw = await file.text();
+      const { validateSave } = await import('./save-data.js');
+      validateSave(JSON.parse(raw));
+      confirmDialog('백업 불러오기', '이 백업으로 현재 진행을 교체할까요? 먼저 현재 진행을 백업해 두세요.', () => {
+        try {
+          importSave(raw);
+          U.sel = myCats()[0]?.id ?? null; U.breed.father = null; U.breed.mother = null;
+          U.world.setupNpcs(G.npcs); render(); toast('진행을 불러왔어요');
+        } catch (error) { toast(error.message); }
+      });
+    } catch (err) { toast(err.message); }
+    finally { e.target.value = ''; }
+  });
+  $('#btnIncome').onclick = () => { const n = collectIncome(); if (n > 0) sound.play('income'); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
   if (!U.sel || !cat(U.sel)) U.sel = myCats()[0]?.id ?? null;
   setInterval(everySecond, 1000);
   render();
@@ -67,11 +132,13 @@ function handleZone(id) {
   else if (id === 'breed') openPanel('breed');
   else if (id.startsWith('npc:')) { U.npc = id.slice(4); openPanel('npc'); }
 }
-function openPanel(tab) { U.tab = tab; U.open = true; render(); }
-function closePanel() { U.open = false; render(); }
+function openPanel(tab) { dexComposing = false; clearTimeout(dexSearchTimer); U.clearStick?.(); U.world.keys = {}; U.world.target = null; U.tab = tab; U.open = true; render(); $('#panel .xbtn').focus({preventScroll:true}); }
+function closePanel() { dexComposing = false; clearTimeout(dexSearchTimer); U.open = false; render(); document.querySelector(`#tabs [data-tab="${U.tab}"]`)?.focus({preventScroll:true}); }
 
 export function render() {
-  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', U.open && b.dataset.tab === U.tab));
+  backgroundInert(U.busy || !$('#modal').hidden);
+  $('#touchStick').hidden = U.open || U.busy || !$('#modal').hidden;
+  document.querySelectorAll('#tabs button').forEach((b) => { const expanded = U.open && b.dataset.tab === U.tab; b.classList.toggle('on', expanded); b.setAttribute('aria-expanded', String(expanded)); b.setAttribute('aria-controls', 'panel'); });
   $('#coins').textContent = G.coins.toLocaleString();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   updateClock();
@@ -79,9 +146,12 @@ export function render() {
   if (!U.open) P.hidden = true;
   else {
     const scroll = P.scrollTop;
+    const restoreFocus = rememberPanelFocus(P);
     P.hidden = false;
-    P.innerHTML = '<button class="xbtn" data-act="closepanel">✕</button>' + { home: homeView, breed: breedView, dex: dexView, shop: shopView, npc: npcView }[U.tab]();
+    P.innerHTML = '<button class="xbtn" data-act="closepanel" aria-label="패널 닫기">✕</button>' + { home: homeView, breed: breedView, dex: dexView, shop: shopView, npc: npcView }[U.tab]();
+    P.querySelector('h2').id = 'panelTitle'; P.setAttribute('aria-labelledby','panelTitle');
     P.scrollTop = scroll;
+    restoreFocus();
   }
   syncWorld();
 }
@@ -90,6 +160,7 @@ function syncWorld() {
   for (const c of myCats()) d.push({ cat: c, pen: 'mine' });
   for (const n of G.npcs) for (const id of n.cats) { const c = cat(id); if (c) d.push({ cat: c, pen: 'npc:' + n.id }); }
   U.world.sync(d);
+  U.world.syncLitter(litterState(myCats(), now()));
 }
 function updateClock() {
   const d = new Date(now());
@@ -103,12 +174,17 @@ function homeView() {
   const c = cat(U.sel);
   const t = now();
   let html = `<h2>🏠 우리집 <small class="hint">고양이 ${cats.length}마리 · 하루 수입 ${Math.round(cats.reduce((s, x) => s + incomePerHour(x) * 24, 0))}</small></h2>`;
+  const litter = litterState(cats, t);
+  html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
+  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button></div>`;
+  html += '<p class="hint"><a href="lab.html">🧪 유전 실험실 — 부모 유전자 편집 · 대량 교배 통계</a></p>';
+  if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
   if (c) html += detailBox(c, t);
   html += `<h3>우리 고양이들</h3><div class="grid">` + cats.map((x) => {
     const gr = growthRemaining(x, t);
     return card(x, { sel: x.id === U.sel, attr: `data-act="select" data-id="${x.id}"`, meta: gr > 0 ? `🍼 <span data-until="${x.birthTime + PARAMS.growthWindowMs}">${fmt(gr)}</span>` : `${PERSONALITIES[x.personality].emoji} ${PERSONALITIES[x.personality].name}` });
   }).join('') + '</div>';
-  if (!cats.length) html += '<p class="sub">고양이가 없어요. 동물샵이나 이웃에게서 교배로 가족을 늘려 보세요!</p>';
+  if (!cats.length) html += '<p class="sub">우리집이 비었어요. 도감은 그대로 보관됩니다. 진행을 백업하거나 새 게임을 시작할 수 있어요.</p><button class="btn sm gray" data-dev="reset">새 게임 시작</button>';
   return html;
 }
 
@@ -116,6 +192,7 @@ function detailBox(c, t) {
   const gr = growthRemaining(c, t);
   let body = `<div class="row" style="margin-bottom:6px">${badge(c)}${personalityChip(c)}${tags(c)}</div>
     <div class="hint" style="margin-bottom:8px">${desc(c)}</div>`;
+  body += `<p class="activity-note" data-cat-activity="${c.id}">🐾 ${U.world.activityOf(c.id)}</p>`;
   if (gr > 0) {
     const p = 1 - gr / PARAMS.growthWindowMs;
     body += `<div class="row" style="justify-content:space-between"><span>🍼 성격 형성 중 (탄생 후 1시간 돌봄)</span><span data-until="${c.birthTime + PARAMS.growthWindowMs}">${fmt(gr)}</span></div>
@@ -130,11 +207,13 @@ function detailBox(c, t) {
     body += `<div class="box" style="margin:0">${p.emoji} <b>${p.name}</b> — ${p.desc}<br><span class="hint">${p.act}</span></div>`;
   }
   const cdLeft = Math.max(0, c.lastBreedAt + PARAMS.breedCooldownMs - t);
+  body += '<h3>오늘의 돌봄</h3><div class="care">' + comfort(c, t).filter(a => gr <= 0 || a.id === 'clean').map(a => `<button data-act="dailycare" data-id="${c.id}" data-a="${a.id}"><span>${a.icon}</span>${a.name}<small class="hint">편안함 ${a.value}%</small></button>`).join('') + '</div><p class="hint">성장 후에도 매일 돌볼 수 있어요. 편안함은 성격·유전·교배 확률에 영향을 주지 않아요.</p>';
   body += `<div class="row" style="margin-top:10px">`
+    + `<button class="btn sm" data-act="focuscat" data-id="${c.id}">🔎 월드에서 보기</button>`
     + `<button class="btn sm" data-act="detail" data-id="${c.id}">🧬 유전자·가계도</button>`
-    + `<button class="btn sm peach" data-act="gobreed" data-id="${c.id}">💞 교배하기</button>`
+    + `<button class="btn sm peach" data-act="gobreed" data-id="${c.id}" ${gr > 0 ? 'disabled' : ''}>💞 교배하기</button>`
     + `<button class="btn sm gray" data-act="sell" data-id="${c.id}">판매 ${sellPrice(c)}🐾</button></div>`
-    + `<div class="hint" style="margin-top:6px">하루 수입 ${incomePerHour(c) * 24}🐾 · ${cdLeft > 0 ? `교배 쿨다운 <span data-until="${c.lastBreedAt + PARAMS.breedCooldownMs}">${fmt(cdLeft)}</span>` : '교배 가능'}</div>`;
+    + `<div class="hint" style="margin-top:6px">하루 수입 ${incomePerHour(c) * 24}🐾 · ${gr > 0 ? '성장 후 교배 가능' : cdLeft > 0 ? `교배 쿨다운 <span data-until="${c.lastBreedAt + PARAMS.breedCooldownMs}">${fmt(cdLeft)}</span>` : '교배 가능'}</div>`;
   return `<div class="box">${body}</div>`;
 }
 
@@ -158,8 +237,8 @@ function candidateList(slot, src) {
 
 function breedView() {
   const B = U.breed, f = cat(B.father), m = cat(B.mother);
-  const slotHtml = (key, c, label) => `<div class="slot ${B.slot === key ? 'on' : ''}" data-act="slot" data-slot="${key}">
-      <div class="hint">${label}</div>${c ? `<img src="${thumbnail(c, 110)}"><div>${c.name} ${badge(c)}</div><div class="hint">${srcLabel(c)}</div>` : '<div style="font-size:40px;margin-top:20px">＋</div>'}</div>`;
+  const slotHtml = (key, c, label) => `<button type="button" class="slot ${B.slot === key ? 'on' : ''}" data-act="slot" data-slot="${key}" aria-pressed="${B.slot === key}">
+      <span class="hint">${label}</span>${c ? `<img src="${thumbnail(c, 110)}" alt=""><span>${c.name} ${badge(c)}</span><span class="hint">${srcLabel(c)}</span>` : '<span style="font-size:40px;margin-top:20px">＋</span>'}</button>`;
   let html = `<h2>💞 교배</h2><div class="sub">수컷 1 + 암컷 1. 새끼는 항상 1마리, 신청자(나)가 데려가요. 교배한 고양이는 24시간 쉬어요.</div>
     <div class="row" style="align-items:stretch">${slotHtml('father', f, '아빠(수컷)')}<div style="align-self:center;font-size:28px">💕</div>${slotHtml('mother', m, '엄마(암컷)')}</div>`;
   const msg = f && m ? checkBreed(f, m) : '아빠와 엄마를 골라 주세요';
@@ -190,6 +269,7 @@ async function runBreed() {
   const f = cat(B.father), m = cat(B.mother);
   const r = doBreed(B.father, B.mother);
   if (r.error) { toast(r.error); return; }
+  sound.play('breed');
   U.busy = true; U.world.enabled = false; U.open = false; render();
   const ov = $('#breedOverlay'); ov.hidden = false;
   if (!U.stage) U.stage = new Stage($('#breedCanvas'));
@@ -204,6 +284,7 @@ async function runBreed() {
 function render0() { $('#coins').textContent = G.coins.toLocaleString(); }
 
 function showResult(r) {
+  sound.play('birth');
   const k = r.kitten;
   openModal(`<h2>🎉 새 가족이 태어났어요!</h2>
     <div class="row" style="align-items:flex-start"><img src="${thumbnail(k, 220)}" style="width:200px;border-radius:20px;background:#fdeccd">
@@ -224,6 +305,8 @@ function dexView() {
   if (U.dexGrade >= 0) entries = entries.filter((e) => e.c.grade === U.dexGrade);
   if (U.dexGrade === 'S') entries = keys.map((k) => ({ k, c: cat(G.dex[k].catId) })).filter((e) => e.c && (e.c.special || e.c.fantasy));
   entries.sort((a, b) => G.dex[b.k].first - G.dex[a.k].first);
+  const query = U.dexSearch.trim().toLocaleLowerCase();
+  if (query) entries = entries.filter(e => `${e.c.name} ${desc(e.c)} ${gradeLabel(e.c)} ${PERSONALITIES[e.c.personality]?.name ?? '성장 중'}`.toLocaleLowerCase().includes(query));
   const shown = entries.slice(0, U.dexPage * 60);
   let html = `<h2>📖 도감</h2>
     <div class="box"><div style="font-size:20px">발견 <b>${tot.found}</b>종</div>
@@ -231,6 +314,7 @@ function dexView() {
     <div class="row" style="margin-bottom:8px"><button class="chip ${U.dexGrade === -1 ? 'on' : ''}" data-act="dexg" data-g="-1">전체</button>`
     + GRADES.map((g, i) => `<button class="chip ${U.dexGrade === i ? 'on' : ''}" data-act="dexg" data-g="${i}">${g}</button>`).join('')
     + `<button class="chip ${U.dexGrade === 'S' ? 'on' : ''}" data-act="dexg" data-g="S">⭐스페셜·판타지</button></div><div class="grid">`;
+  html = html.replace('<div class="grid">', `<label class="dex-search">🔎 도감 검색 <input id="dexSearch" type="search" maxlength="80" placeholder="이름, 털색, 무늬, 성격" value="${escapeHtml(U.dexSearch)}"></label><div class="hint" role="status">검색 결과 ${entries.length}종</div><div class="grid">`);
   html += shown.map((e) => card(e.c, { attr: `data-act="detail" data-id="${e.c.id}" data-view="1"`, meta: '' })).join('') + '</div>';
   if (shown.length < entries.length) html += `<div class="row" style="justify-content:center;margin-top:10px"><button class="btn sm" data-act="dexmore">더 보기</button></div>`;
   if (!entries.length) html += '<p class="sub">아직 이 분류의 고양이를 만나지 못했어요.</p>';
@@ -240,7 +324,7 @@ function dexView() {
 /* ───── 동물샵 ───── */
 function shopView() {
   const sc = shopCats();
-  let html = `<h2>🛍️ 동물샵</h2><div class="sub">마음에 드는 고양이와 교배하면 (재화 지불) 그 고양이는 가게에서 사라지고 새 고양이가 들어와요. 새끼는 항상 1마리, 내가 데려가요.</div><div class="grid">`;
+  let html = `<h2>🛍️ 동물샵</h2><div class="sub">마음에 드는 고양이와 교배하면 (재화 지불) 그 고양이는 가게에서 사라지고 새 고양이가 들어와요. 새끼는 항상 1마리, 내가 데려가요.</div><p class="hint">다음 입고까지 <span data-until="${G.shopRefreshAt}">${fmt(Math.max(0, G.shopRefreshAt - now()))}</span> · 6시간마다 새 친구가 와요</p><div class="grid">`;
   html += sc.map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, meta: `🐾 ${shopBreedPrice(c)}${c.carriers ? ` · 🧬${c.carriers}` : ''}` })).join('') + '</div>';
   html += `<div class="hint" style="margin-top:6px">🧬 숫자 = 겉으로 안 드러나는 희귀 열성 유전자 보인자 수 (가격에 반영)</div>
     <h3>우리 고양이 팔기</h3><div class="grid">` + myCats().map((c) => card(c, { attr: `data-act="sell" data-id="${c.id}"`, meta: `팔기 ${sellPrice(c)}🐾` })).join('') + '</div>';
@@ -252,15 +336,40 @@ function npcView() {
   let html = `<h2>🏘️ 이웃</h2><div class="sub">프로토타입: 이웃(NPC)은 교환과 교배 신청을 언제나 수락해요. 횟수 제한 없음.</div>`;
   for (const n of (U.npc ? G.npcs.filter((x) => x.id === U.npc) : G.npcs)) {
     html += `<div class="box"><div style="font-size:18px">${n.icon} ${n.name}</div><div class="grid" style="margin-top:6px">`
-      + n.cats.map(cat).map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, meta: `<button class="btn sm" data-act="trade" data-npc="${n.id}" data-id="${c.id}">교환</button> <button class="btn sm peach" data-act="npcbreed" data-id="${c.id}">교배신청</button>` })).join('')
+      + n.cats.map(cat).map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, actions: `<button class="btn sm" data-act="trade" data-npc="${n.id}" data-id="${c.id}">교환</button> <button class="btn sm peach" data-act="npcbreed" data-id="${c.id}">교배신청</button>` })).join('')
       + '</div></div>';
   }
   return html;
 }
 
 /* ───── 모달 ───── */
-function openModal(html) { const m = $('#modal'); m.innerHTML = `<div class="dialog">${html}</div>`; m.hidden = false; U.world.enabled = false; }
-function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; if (!U.busy) U.world.enabled = true; }
+let modalReturnFocus = null, pendingConfirm = null;
+function backgroundInert(value) { for (const selector of ['#top','#tabs','#panel','#world','#watchingCat','#touchStick']) $(selector).inert = value; }
+function openModal(html) {
+  if ($('#modal').hidden) modalReturnFocus = document.activeElement;
+  pendingConfirm = null;
+  U.clearStick?.(); U.world.keys = {}; U.world.target = null; $('#touchStick').hidden = true;
+  const m = $('#modal'); m.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" tabindex="-1">${html}</div>`; m.hidden = false; U.world.enabled = false;
+  const dialog = m.querySelector('.dialog'), heading = dialog.querySelector('h2');
+  if (heading) { heading.id = 'dialogTitle'; dialog.setAttribute('aria-labelledby',heading.id); }
+  backgroundInert(true);
+  dialog.focus({preventScroll:true});
+}
+function closeModal() {
+  if ($('#modal').hidden) return;
+  $('#modal').hidden = true; $('#modal').innerHTML = ''; pendingConfirm = null;
+  backgroundInert(U.busy);
+  if (!U.busy) U.world.enabled = true;
+  $('#touchStick').hidden = U.open || U.busy;
+  if (modalReturnFocus?.isConnected && modalReturnFocus.matches('button,a[href],input,select,textarea,[tabindex]') && !modalReturnFocus.closest('[hidden],[inert]') && !modalReturnFocus.disabled) modalReturnFocus.focus({preventScroll:true});
+  else document.querySelector(`#tabs [data-tab="${U.tab}"]`)?.focus({preventScroll:true});
+  modalReturnFocus = null;
+}
+function confirmDialog(title, message, action) {
+  openModal(`<h2>${escapeHtml(title)}</h2><p class="confirm-message" id="confirmDescription">${escapeHtml(message)}</p><div class="row" style="justify-content:flex-end"><button class="btn gray" data-act="close">취소</button><button class="btn peach" data-act="confirm">확인</button></div>`);
+  $('#modal .dialog').setAttribute('aria-describedby','confirmDescription');
+  pendingConfirm = action;
+}
 
 const REC = { B: ['b', 'bl'], D: ['d'], A: ['a'], T: ['m'], S: ['s'], C: ['cb', 'cs'], L: ['l'], I: ['i'], O: ['o'] };
 const LOCI_KO = { B: '갈색(B)', D: '희석(D)', A: '아구티(A)', T: '태비(T)', S: '흰반점(S)', C: '색소제한(C)', L: '털길이(L)', I: '실버(I)', O: '오렌지(X^O)', P1: '농도1', P2: '농도2', P3: '농도3' };
@@ -303,33 +412,56 @@ function onClick(e) {
   const dev = e.target.closest('[data-dev]');
   if (dev) {
     const v = dev.dataset.dev;
-    if (v === '1h') skipTime(3600e3); else if (v === '1d') skipTime(86400e3); else if (confirm('저장 데이터를 지우고 새 게임을 시작할까요?')) { reset(); U.sel = myCats()[0].id; U.breed = { father: null, mother: null, slot: 'father', src: 'mine' }; }
+    if (U.busy) return;
+    if (v === '1h') skipTime(3600e3); else if (v === '1d') skipTime(86400e3); else {
+      confirmDialog('새 게임 시작', '저장 데이터를 교체하고 새 게임을 시작할까요? 먼저 진행을 백업해 주세요.', () => {
+        reset(); U.sel = myCats()[0].id; U.breed = { father: null, mother: null, slot: 'father', src: 'mine' };
+        stageKey = ''; afterTick(); render();
+      });
+      return;
+    }
     stageKey = ''; afterTick(); render(); return;
   }
   const tb = e.target.closest('#tabs button');
-  if (tb) { gotoTab(tb.dataset.tab); return; }
+  if (tb) { if (!U.busy && $('#modal').hidden) gotoTab(tb.dataset.tab); return; }
   const el = e.target.closest('[data-act]');
   if (!el) { if (e.target.id === 'modal') closeModal(); return; }
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'confirm': { const action = pendingConfirm; closeModal(); action?.(); break; }
+    case 'focuscat': U.world.focusCat(d.id); closePanel(); break;
+    case 'dailycare': {
+      const r = careDaily(d.id, d.a);
+      if (r.ok) { fx(r.fx); sound.play(d.a); U.world.react(d.id, d.a); } else toast(r.msg);
+      render(); break;
+    }
+    case 'backup': {
+      const url = URL.createObjectURL(new Blob([exportSave()], { type: 'application/json' }));
+      const date = new Date(), stamp = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+      const a = document.createElement('a'); a.href = url; a.download = `냥냥하우스-${stamp}.json`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000); break;
+    }
+    case 'restore': $('#saveFile').click(); break;
     case 'closepanel': closePanel(); break;
     case 'select': U.sel = d.id; render(); break;
     case 'care': {
       const r = care(d.id, d.a);
-      if (!r.ok) toast(r.msg); else fx(r.fx, 5);
+      if (!r.ok) toast(r.msg); else { fx(r.fx, 5); sound.play(d.a); U.world.react(d.id, d.a); }
       render(); break; }
     case 'detail': e.stopPropagation(); showDetail(d.id, !!d.view); break;
     case 'close': closeModal(); break;
     case 'goto': closeModal(); gotoTab(d.tab); break;
     case 'sell': {
       const c = cat(d.id);
-      if (confirm(`${c.name}을(를) ${sellPrice(c)}🐾에 판매할까요? (되돌릴 수 없어요)`)) {
-        const p = sell(d.id); toast(`🐾 ${p}에 판매했어요`);
+      confirmDialog('고양이 판매', `${c.name}을(를) ${sellPrice(c)}🐾에 판매할까요? (되돌릴 수 없어요)`, () => {
+        const p = sell(d.id);
+        if (p === null) { toast('지금은 판매할 수 없는 고양이예요'); return; }
+        toast(`🐾 ${p}에 판매했어요`);
         if (U.sel === d.id) U.sel = myCats()[0]?.id ?? null;
         if (B.father === d.id) B.father = null; if (B.mother === d.id) B.mother = null;
         stageKey = ''; render();
-      } break; }
+      }); break; }
     case 'gobreed': { const c = cat(d.id); B[c.sex === 'M' ? 'father' : 'mother'] = c.id; B.slot = c.sex === 'M' ? 'mother' : 'father'; B.src = 'mine'; gotoTab('breed'); break; }
     case 'slot': B.slot = d.slot; render(); break;
     case 'src': B.src = d.src; render(); break;
@@ -366,11 +498,18 @@ function afterTick() {
 }
 function everySecond() {
   if (U.busy) return;
+  const shopRefreshAt = G.shopRefreshAt;
   const changed = afterTick();
   updateClock();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   const t = now();
-  if (changed) { stageKey = ''; render(); return; }
+  const litter = litterState(myCats(), t);
+  U.world.syncLitter(litter);
+  if ($('#litterStatus')) $('#litterStatus').textContent = litterSummary(litter);
+  document.querySelectorAll('[data-cat-activity]').forEach(el => { el.textContent = '🐾 ' + U.world.activityOf(el.dataset.catActivity); });
+  const watchedId = $('#watchingCat').dataset.id;
+  if (watchedId && cat(watchedId)) $('#watchingLabel').textContent = `${cat(watchedId).name} 관찰 중 · ${U.world.activityOf(watchedId)}`;
+  if (changed || shopRefreshAt !== G.shopRefreshAt) { stageKey = ''; render(); return; }
   document.querySelectorAll('[data-until]').forEach((el) => {
     const left = +el.dataset.until - t;
     if (left <= 0) { render(); return; }

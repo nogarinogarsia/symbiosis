@@ -1,7 +1,8 @@
 // 코드로 만든 프로시저럴 툰 고양이 (구·캡슐·튜브 조합 + 인버티드 헐 외곽선)
 import * as THREE from 'three';
 import { resolveAppearance, FANTASY_PALETTE, mix } from './appearance.js';
-import { partTextures, eyeTexture, furAlpha } from './textures.js';
+import { partTextures, releasePartTextures, eyeTexture, furAlpha } from './textures.js';
+import { behaviorOf } from './behavior.js';
 
 const INK = 0x4a3330;
 const OUTLINES = false; // 툰 셰이딩은 유지, 테두리는 제거
@@ -58,6 +59,8 @@ export function buildCat(cat, opts = {}) {
   const b = cat.body;
   const long = app.long && !app.hairless;
   const root = new THREE.Group();
+  root.userData.textureSet = tex;
+  try {
   const rig = new THREE.Group(); root.add(rig);
 
   const matBody = toon(0xffffff, { map: tex.body });
@@ -78,9 +81,11 @@ export function buildCat(cat, opts = {}) {
   const body = addPart(rig, bodyGeo, matBody, { pos: [0, 0.62, 0], scale: [wK, hK, dK] });
   // 다리 / 엉덩이
   const legGeo = new THREE.CapsuleGeometry(0.11, 0.32, 6, 12);
+  const frontParts = [];
   for (const s of [-1, 1]) {
-    addPart(rig, legGeo, matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.32, 0.5] });
-    addPart(rig, sphere(), matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.08, 0.58], scale: [0.14, 0.09, 0.19], outline: 0.02 });
+    const leg = addPart(rig, legGeo, matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.32, 0.5] });
+    const paw = addPart(rig, sphere(), matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.08, 0.58], scale: [0.14, 0.09, 0.19], outline: 0.02 });
+    frontParts.push({ leg, paw, side: s });
     addPart(rig, sphere(), matThigh, { pos: [s * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44], outline: 0.026 });
     addPart(rig, sphere(), matLegs, { pos: [s * wK * 0.7, 0.08, 0.2], scale: [0.14, 0.09, 0.22], outline: 0.02 });
   }
@@ -174,19 +179,75 @@ export function buildCat(cat, opts = {}) {
   rig.scale.setScalar(base * root.userData.sizeMul);
   if (baby) head.scale.multiplyScalar(1.22);
 
-  // 모든 고양이 동일한 아이들 모션 (성격별 모션은 추후)
+  // Different rhythms and head/tail gestures preserve the shared dot-eye style.
+  const behavior = behaviorOf(cat);
+  const yarn = addPart(rig, sphere(.18), toon(0xf09fbc), { pos: [0, .2, 1.35], outline: 0 });
+  yarn.visible = false;
+  let reaction = null;
+  root.userData.react = action => { reaction = { action, start: performance.now() }; };
   const t0 = Math.random() * 10;
-  root.userData.tick = (t) => {
+  root.userData.tick = (t, { activity = 'idle', moving = false, dt = 1 / 60 } = {}) => {
     const s = t + t0;
     body.scale.y = hK * (1 + Math.sin(s * 1.8) * 0.014);
-    head.rotation.z = Math.sin(s * 0.9) * 0.04;
+    head.rotation.z = Math.sin(s * 0.9) * behavior.sway;
     head.position.y = 1.28 + Math.sin(s * 1.8) * 0.01;
-    tailGroup.rotation.y = Math.sin(s * 1.6) * 0.22;
+    tailGroup.rotation.y = Math.sin(s * behavior.speed * 1.6) * behavior.tail;
     const blink = (s % 4.2) > 4.05 ? 0.1 : 1;
     for (const e of eyes) e.scale.y = blink;
+    const elapsed = reaction ? (performance.now() - reaction.start) / 1000 : 99;
+    const active = elapsed < 5;
+    yarn.visible = active && reaction.action === 'yarn';
+    const pose = { x: 0, z: 0, y: 0, px: 0 };
+    head.rotation.x = 0; head.rotation.y = 0;
+    for (const { leg, paw, side } of frontParts) {
+      const swing = moving ? Math.sin(t * 9 + side * Math.PI / 2) : 0;
+      leg.rotation.x = swing * .3; leg.position.y = .32;
+      paw.position.set(paw.position.x, .08 + Math.max(0, swing) * .12, .58 + swing * .1);
+    }
+    if (!active && !moving) {
+      if (activity === 'nap') {
+        pose.z = -1.2; pose.y = .5;
+        for (const e of eyes) e.scale.y = .12;
+        tailGroup.rotation.y = Math.sin(s) * .04;
+      } else if (activity === 'groom') {
+        frontParts[0].leg.rotation.x = -.8; frontParts[0].leg.position.y = .5;
+        frontParts[0].paw.position.y = .72; frontParts[0].paw.position.z = .7;
+        head.rotation.x = .28 + Math.sin(s * 5) * .08; head.rotation.z = -.12;
+      } else if (activity === 'hide') {
+        pose.x = .2; head.rotation.x = .18;
+        for (const e of eyes) e.scale.y = .65;
+      } else if (activity === 'rub') {
+        pose.z = Math.sin(s * 2) * .18; pose.px = Math.sin(s * 2) * .1;
+        for (const e of eyes) e.scale.y = .4;
+      } else if (activity === 'pounce') {
+        pose.x = -.12 + Math.sin(s * 4) * .1; pose.y = Math.abs(Math.sin(s * 4)) * .13;
+      } else if (activity === 'watch' || activity === 'explore') {
+        head.rotation.y = Math.sin(s * .7) * .4;
+      } else if (activity === 'alert') {
+        head.rotation.y = Math.sin(s * 2) * .35; tailGroup.rotation.y = Math.sin(s * 7) * .3;
+      }
+    }
+    if (active) {
+      if (reaction.action === 'yarn') {
+        yarn.position.set(Math.sin(elapsed * 4) * .5, .2 + Math.abs(Math.sin(elapsed * 5)) * .1, 1.25);
+        yarn.rotation.z = elapsed * 5; head.rotation.z = Math.sin(elapsed * 4) * .18;
+        pose.x = Math.sin(elapsed * 6) * .06;
+      } else if (reaction.action === 'feed') {
+        head.rotation.x = .15 + Math.sin(elapsed * 5) * .08;
+      } else if (reaction.action === 'pet') {
+        pose.z = Math.sin(elapsed * 2) * .12;
+        for (const e of eyes) e.scale.y = .35;
+      }
+    }
+    const blend = 1 - Math.exp(-Math.min(.05, dt) * 9);
+    rig.rotation.x = THREE.MathUtils.lerp(rig.rotation.x, pose.x, blend);
+    rig.rotation.z = THREE.MathUtils.lerp(rig.rotation.z, pose.z, blend);
+    rig.position.x = THREE.MathUtils.lerp(rig.position.x, pose.px, blend);
+    rig.position.y = THREE.MathUtils.lerp(rig.position.y, pose.y, blend);
   };
   root.userData.parts = { rig, head, tailGroup, app };
   return root;
+  } catch (error) { disposeCat(root); throw error; }
 }
 
 /* ───────── 스페셜 의상 10종 ───────── */
@@ -267,6 +328,15 @@ function addCostume(id, head, rig, d) {
 }
 
 export function disposeCat(root) {
-  root.traverse((o) => { if (o.geometry) o.geometry.dispose?.(); });
+  if (root.userData.disposed) return;
+  root.userData.disposed = true;
+  const geometries = new Set(), materials = new Set();
+  root.traverse(o => {
+    if (o.geometry) geometries.add(o.geometry);
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) if (m) materials.add(m);
+  });
+  geometries.forEach(g => g.dispose());
+  materials.forEach(m => m.dispose());
+  if (root.userData.textureSet) { releasePartTextures(root.userData.textureSet); root.userData.textureSet = null; }
 }
 void mix;

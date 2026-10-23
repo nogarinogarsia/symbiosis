@@ -1,6 +1,7 @@
 // 3D 월드: 내 우리 + 이웃 우리 + 동물샵·교배집 건물. 플레이어가 걸어 다니며 다가가면 창이 열림.
 import * as THREE from 'three';
-import { buildCat } from './cat3d.js';
+import { behaviorOf, chooseActivity, ACTIVITY_NAMES } from './behavior.js';
+import { buildCat, disposeCat } from './cat3d.js';
 import { toon } from './cat3d.js';
 import { addLights } from './stage.js';
 import { RNG } from './rng.js';
@@ -42,7 +43,7 @@ export class World {
     this.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
     this.clock = new THREE.Clock();
     this.colliders = []; this.zones = []; this.pens = {}; this.catObjs = new Map(); this.npcAvatars = []; this.pulsers = [];
-    this.keys = {}; this.target = null; this.enabled = true; this.inside = {};
+    this.keys = {}; this.target = null; this.enabled = true; this.inside = {}; this.stick = { x: 0, y: 0 };
     this.buildGround(); this.buildDecor(); this.buildBuildings(); this.buildPens();
     this.player = this.makeAvatar({ hair: 0xf1e3c8, shirt: 0xffffff, stripe: 0x3a4a63, pants: 0x4a5f8a, skin: 0xf3c9a6 });
     this.player.position.set(-1, 0, 13); this.scene.add(this.player);
@@ -147,7 +148,40 @@ export class World {
   }
   buildPens() {
     this.buildPen('mine', -9, 2, 12, 9, '🏠 우리 집', 0xf5e6b8);
+    this.buildLitterTray();
     this.npcPositions = [-24, -12, 0, 12, 24];
+  }
+  buildLitterTray() {
+    const pen = this.pens.mine;
+    const tray = new THREE.Group(); tray.position.set(pen.minX + .6, 0, pen.maxZ - .4);
+    box(2.1, .18, 1.4, 0x9cbda6, 0, .06, 0, tray);
+    box(1.85, .04, 1.15, 0xe6cfa3, 0, .25, 0, tray);
+    for (const x of [-1, 1]) box(.14, .2, 1.4, 0x9cbda6, x, .12, 0, tray);
+    for (const z of [-.65, .65]) box(2.1, .2, .14, 0x9cbda6, 0, .12, z, tray);
+    this.scene.add(tray); this.litterTray = tray;
+    this.litterPiles = new THREE.Group(); tray.add(this.litterPiles);
+  }
+  syncLitter(state) {
+    const key = state.total + '|' + state.items.map(item => `${item.catId}:${item.index}`).join('|');
+    if (key === this.litterKey) return;
+    this.litterKey = key;
+    for (const pile of [...this.litterPiles.children]) { this.litterPiles.remove(pile); disposeCat(pile); }
+    if (this.litterLabel) {
+      this.litterTray.remove(this.litterLabel); this.litterLabel.material.map.dispose(); this.litterLabel.material.dispose();
+    }
+    for (const item of state.items) {
+      const rng = new RNG(item.seed), pile = new THREE.Group();
+      pile.userData.cleanCatId = item.catId;
+      pile.position.set(rng.range(-.75, .75), .3, rng.range(-.4, .4));
+      for (let i = 0; i < 3; i++) {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(.14 - i * .035, 10, 8), toon(0x987252));
+        mesh.position.set(i * .015, i * .1, 0); mesh.scale.y = .65; pile.add(mesh);
+      }
+      this.litterPiles.add(pile);
+    }
+    this.litterLabel = label(state.total ? `🧹 청소 ${state.total}` : '✨ 깨끗한 화장실', { scale: .62, bg: state.total ? '#ffe5c7' : '#edf5df' });
+    this.litterLabel.position.set(0, 1.6, 0); this.litterTray.add(this.litterLabel);
+    this.litterTray.userData.cleanCatId = state.items[0]?.catId ?? null;
   }
   /* NPC 우리는 game 데이터가 정해진 뒤 만든다 */
   setupNpcs(npcs) {
@@ -199,18 +233,24 @@ export class World {
     const k = (e, v) => {
       const key = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        if (!v) { delete this.keys[key]; return; }
+        if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
         this.keys[key] = v; if (v) this.target = null; e.preventDefault();
       }
     };
     addEventListener('keydown', (e) => k(e, true)); addEventListener('keyup', (e) => k(e, false));
     addEventListener('blur', () => { this.keys = {}; });
     this.ray = new THREE.Raycaster(); this.ndc = new THREE.Vector2();
-    let down = null;
-    this.canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
+    let down = null, lastX = 0;
+    this.canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; lastX = e.clientX; this.canvas.setPointerCapture(e.pointerId); });
+    this.canvas.addEventListener('pointermove', e => {
+      if (down && this.followCatId) { this.orbit = (this.orbit ?? 0) + (e.clientX - lastX) * .012; lastX = e.clientX; }
+    });
+    this.canvas.addEventListener('pointercancel', () => { down = null; });
     this.canvas.addEventListener('pointerup', (e) => {
-      if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
-      down = null; if (!this.enabled) return;
+      const start = down; down = null;
+      if (!start || Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 6) return;
+      if (!this.enabled) return;
       this.pick(e);
     });
     addEventListener('resize', () => this.resize());
@@ -220,10 +260,11 @@ export class World {
     this.ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);
     const catRoots = [...this.catObjs.values()].map((c) => c.holder);
-    const hits = this.ray.intersectObjects([...catRoots, ...this.npcAvatars, ...(this.clickables || [])], true);
+    const hits = this.ray.intersectObjects([...catRoots, ...this.npcAvatars, this.litterTray, ...(this.clickables || [])], true);
     for (const h of hits) {
       let o = h.object;
       while (o) {
+        if (o.userData.cleanCatId) { this.hooks.onClean?.(o.userData.cleanCatId); return; }
         if (o.userData.catId) { this.hooks.onCat?.(o.userData.catId); return; }
         if (o.userData.npcId) { this.hooks.onZone?.('npc:' + o.userData.npcId, true); return; }
         if (o.userData.zoneId) { this.hooks.onZone?.(o.userData.zoneId, true); return; }
@@ -231,7 +272,7 @@ export class World {
       }
     }
     const gh = this.ray.intersectObject(this.ground)[0];
-    if (gh) this.target = new THREE.Vector3(gh.point.x, 0, gh.point.z);
+    if (gh) { this.stopWatching(); this.target = new THREE.Vector3(gh.point.x, 0, gh.point.z); }
   }
   resize() {
     const w = innerWidth, h = innerHeight;
@@ -240,7 +281,8 @@ export class World {
   }
   snapCamera() { this.camPos.set(this.player.position.x, 0, this.player.position.z); this.placeCamera(); }
   placeCamera() {
-    this.camera.position.set(this.camPos.x, 15.5, this.camPos.z + 15);
+    const distance = this.viewDistance ?? 15.5, orbit = this.followCatId ? this.orbit ?? 0 : 0;
+    this.camera.position.set(this.camPos.x + Math.sin(orbit) * distance * .97, distance, this.camPos.z + Math.cos(orbit) * distance * .97);
     this.camera.lookAt(this.camPos.x, 1, this.camPos.z - 0.5);
   }
   teleport(x, z) { this.player.position.set(x, 0, z); this.target = null; this.snapCamera(); }
@@ -250,7 +292,7 @@ export class World {
     const want = new Map(desired.map((d) => [d.cat.id, d]));
     for (const [id, o] of [...this.catObjs]) {
       const d = want.get(id);
-      if (!d || d.pen !== o.pen || o.key !== this.keyOf(d.cat)) { this.scene.remove(o.holder); this.catObjs.delete(id); }
+      if (!d || d.pen !== o.pen || o.key !== this.keyOf(d.cat)) { this.scene.remove(o.holder); disposeCat(o.root); this.catObjs.delete(id); }
     }
     for (const d of desired) {
       if (this.catObjs.has(d.cat.id) || !this.pens[d.pen]) continue;
@@ -261,16 +303,31 @@ export class World {
       holder.rotation.y = Math.random() * 6.28;
       holder.userData.catId = d.cat.id;
       this.scene.add(holder);
-      this.catObjs.set(d.cat.id, { holder, root, pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * 3, tx: 0, tz: 0, moving: false, speed: 0.9 + Math.random() * 0.5 });
+      const behavior = behaviorOf(d.cat);
+      this.catObjs.set(d.cat.id, { holder, root, behavior, personality: d.cat.personality, activity: 'idle', duration: behavior.rest,
+        pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * behavior.rest, tx: 0, tz: 0, moving: false, speed: behavior.speed });
     }
+    if (this.followCatId && !this.catObjs.has(this.followCatId)) this.stopWatching();
   }
-  keyOf(c) { return [c.id, c.personality === null || c.personality === undefined ? 'b' : 'a', c.costume || ''].join('|'); }
+  keyOf(c) { return [c.id, c.personality ?? 'baby', c.costume || ''].join('|'); }
+  react(id, action) {
+    const o = this.catObjs.get(id);
+    if (!o) return;
+    o.root.userData.react?.(action);
+    o.moving = false; o.wait = 5; o.activity = 'care';
+  }
+  activityOf(id) { return ACTIVITY_NAMES[this.catObjs.get(id)?.activity] ?? ACTIVITY_NAMES.idle; }
+  focusCat(id) { if (this.catObjs.has(id)) { this.followCatId = id; this.orbit = 0; this.target = null; this.keys = {}; this.hooks.onFocus?.(id); } }
+  stopWatching() { if (!this.followCatId) return; this.followCatId = null; this.hooks.onFocus?.(null); }
 
   /* ───── 프레임 ───── */
   frame() {
     const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
     this.movePlayer(dt, t);
-    this.camPos.lerp(new THREE.Vector3(this.player.position.x, 0, this.player.position.z), 1 - Math.exp(-dt * 4));
+    const followed = this.catObjs.get(this.followCatId);
+    const anchor = followed ? followed.holder.position : this.player.position;
+    this.camPos.lerp(new THREE.Vector3(anchor.x, 0, anchor.z), 1 - Math.exp(-dt * 4));
+    this.viewDistance = THREE.MathUtils.lerp(this.viewDistance ?? 15.5, followed ? 7.5 : 15.5, 1 - Math.exp(-dt * 4));
     this.placeCamera();
     this.updateCats(dt, t);
     for (const av of this.npcAvatars) { av.userData.inner.position.y = Math.sin(t * 2 + av.position.x) * 0.03; av.userData.head.rotation.z = Math.sin(t * 1.3 + av.position.x) * 0.06; }
@@ -282,6 +339,7 @@ export class World {
     const p = this.player;
     let dx = 0, dz = 0;
     if (this.enabled) {
+      dx = this.stick.x; dz = this.stick.y;
       if (this.keys.w || this.keys.arrowup) dz -= 1; if (this.keys.s || this.keys.arrowdown) dz += 1;
       if (this.keys.a || this.keys.arrowleft) dx -= 1; if (this.keys.d || this.keys.arrowright) dx += 1;
       if (!dx && !dz && this.target) {
@@ -291,7 +349,8 @@ export class World {
     }
     const moving = dx || dz;
     if (moving) {
-      const l = Math.hypot(dx, dz); dx /= l; dz /= l;
+      this.stopWatching();
+      const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
       const sp = 6.2 * dt;
       this.tryMove(p.position, dx * sp, 0); this.tryMove(p.position, 0, dz * sp);
       const ang = Math.atan2(dx, dz);
@@ -309,25 +368,31 @@ export class World {
   updateCats(dt, t) {
     for (const o of this.catObjs.values()) {
       const pen = this.pens[o.pen], h = o.holder, root = o.root;
-      root.userData.tick?.(t);
+      const behavior = o.behavior;
       if (!o.moving) {
         o.wait -= dt;
         root.position.y = 0;
+        root.rotation.z = 0;
         if (o.wait <= 0) {
-          if (Math.random() < 0.55) {
-            o.tx = THREE.MathUtils.lerp(pen.minX, pen.maxX, Math.random()); o.tz = THREE.MathUtils.lerp(pen.minZ, pen.maxZ, Math.random()); o.moving = true;
-          } else o.wait = 1.5 + Math.random() * 4;
+          const peers = [...this.catObjs.values()].filter(p => p !== o && p.pen === o.pen).map(p => ({ x: p.holder.position.x, z: p.holder.position.z }));
+          const plan = chooseActivity(o.personality, h.position, peers, pen);
+          o.activity = plan.kind; o.duration = plan.duration;
+          o.wait = plan.duration;
+          if (plan.target) { o.tx = plan.target.x; o.tz = plan.target.z; o.moving = true; }
         }
       } else {
         const ex = o.tx - h.position.x, ez = o.tz - h.position.z, dist = Math.hypot(ex, ez);
-        if (dist < 0.15) { o.moving = false; o.wait = 1.5 + Math.random() * 5; root.position.y = 0; continue; }
+        if (dist < 0.15) { o.moving = false; o.wait = o.duration; root.position.y = 0; root.rotation.z = 0; }
+        else {
         const ang = Math.atan2(ex, ez);
         let da = ang - h.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); h.rotation.y += da * Math.min(1, dt * 6);
         const step = Math.min(dist, o.speed * dt);
         h.position.x += ex / dist * step; h.position.z += ez / dist * step;
-        root.position.y = Math.abs(Math.sin(t * 9 + o.speed * 10)) * 0.12;
-        root.rotation.z = Math.sin(t * 9 + o.speed * 10) * 0.04;
+        root.position.y = Math.abs(Math.sin(t * 9 + o.speed * 10)) * behavior.bounce;
+        root.rotation.z = Math.sin(t * 9 + o.speed * 10) * behavior.sway;
+        }
       }
+      root.userData.tick?.(t, { activity: o.activity, moving: o.moving, dt });
     }
   }
   checkZones() {
