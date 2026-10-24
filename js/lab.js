@@ -1,6 +1,8 @@
 import { experimentParent, alleleOptions, parseExperiment, createReport, simulateBatch } from './simulation.js';
 import { phenotypeName, gradeLabel } from './engine.js';
 import { GRADES } from './params.js';
+import { expectedCross } from './expectation.js';
+import { rememberPanelFocus } from './focus.js';
 
 const $ = s => document.querySelector(s);
 const labels = { B: '갈색', D: '희석', A: '아구티', T: '태비', S: '흰반점', C: '색소제한', L: '털길이', I: '실버', O: '오렌지 (X)', P1: '농도 1', P2: '농도 2', P3: '농도 3' };
@@ -8,16 +10,28 @@ let father, mother, running = false, cancelled = false, revision = 0;
 let thumbnail = null;
 try { ({ thumbnail } = await import('./stage.js')); } catch { /* Text statistics also work without the CDN. */ }
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const traitLabels={dilute:'희석',long:'장모',tortie:'토티 (전체 자손)',point:'포인트',mink:'밍크',sepia:'세피아'};
+const percent=p=>`${(p*100).toFixed(1)}%`;
+function renderExpectation(){
+  const expected=expectedCross(father,mother);
+  const rows=(label,distribution)=>Object.entries(distribution).map(([genotype,p])=>`<tr><th scope="row">${esc(label)}</th><td>${esc(genotype)}</td><td>${percent(p)}</td></tr>`).join('');
+  $('#expectation').innerHTML=`<h2>🧮 실험 전, 이론으로 예상하기</h2><p class="muted">부모의 대립유전자를 하나씩 고르는 모든 경우를 합산합니다. 게임 모델의 확률이며 표본의 비율은 이론과 다를 수 있어요.</p><div class="theory-traits">${Object.entries(expected.traits).map(([key,p])=>`<div class="metric">${traitLabels[key]}<strong data-expected="${key}">${percent(p)}</strong></div>`).join('')}</div>
+    <p class="muted">성별은 암컷·수컷 각각 50%. 토티는 암컷 이형접합 자손의 확률 × 50%입니다. SPECIAL·판타지·의상·외형 파라미터는 이 표에 포함하지 않습니다.</p>
+    <details><summary>좌위별 이론 비율 · X연관은 성별 안의 비율</summary><table><thead><tr><th>좌위</th><th>자손 유전자형</th><th>이론 비율</th></tr></thead><tbody>${Object.entries(expected.loci).map(([locus,distribution])=>rows(locus,distribution)).join('')}${rows('O · 딸 중',expected.daughters)}${rows('O · 아들 중',expected.sons)}</tbody></table></details>`;
+}
 function picture(cat) {
   if (!thumbnail) return '<span aria-hidden="true" style="font-size:60px">🐱</span>';
   try { return `<img src="${thumbnail(cat, 130)}" alt="${esc(phenotypeName(cat.ph))}">`; }
   catch { return '<span aria-hidden="true" style="font-size:60px">🐱</span>'; }
 }
 function renderParent(key, parent, title) {
+  const restoreFocus=rememberPanelFocus($(`#${key}`));
   $(`#${key}`).innerHTML = `<h2>${title}</h2><div class="parent-preview">${picture(parent)}<div><b>${gradeLabel(parent)}</b><p>${phenotypeName(parent.ph)}</p></div></div><table><thead><tr><th scope="col">유전자좌</th><th scope="col">대립유전자</th></tr></thead><tbody>` + Object.entries(alleleOptions).map(([locus, options]) => `<tr><th scope="row">${labels[locus]} (${locus})</th><td>` + parent.genome[locus].map((allele, i) => `<select data-parent="${key}" data-locus="${locus}" data-index="${i}" aria-label="${title} ${labels[locus]} 대립유전자 ${i + 1}">` + options.map(a => `<option value="${a}" ${a === allele ? 'selected' : ''}>${a}</option>`).join('') + '</select>').join('') + '</td></tr>').join('') + '</tbody></table>';
+  restoreFocus();
 }
 function renderParents() {
   renderParent('father', father, '♂ 아빠'); renderParent('mother', mother, '♀ 엄마');
+  renderExpectation();
 }
 function config() { return { version: 1, seed: $('#seed').value.trim(), count: +$('#count').value, father: father.genome, mother: mother.genome }; }
 function invalidate() {
@@ -38,7 +52,7 @@ $('.parents').addEventListener('change', e => {
   try {
     const updated = experimentParent($('#seed').value.trim(), parent === 'father' ? 'M' : 'F', genome);
     if (parent === 'father') father = updated; else mother = updated;
-    renderParent(parent, updated, parent === 'father' ? '♂ 아빠' : '♀ 엄마'); invalidate();
+    renderParent(parent, updated, parent === 'father' ? '♂ 아빠' : '♀ 엄마'); renderExpectation(); invalidate();
   } catch (err) { $('#status').textContent = err.message; }
 });
 $('#seed').addEventListener('change', invalidate); $('#count').addEventListener('change', invalidate);
@@ -62,6 +76,11 @@ function showResults(report, seed, complete) {
   const largest = Math.max(...Object.values(report.catalog));
   $('#results').innerHTML = `<h2>${complete ? '실험 결과' : '중지한 실험 결과'}</h2><p class="muted">seed: ${esc(seed)} · 고정된 부모 쌍의 독립 교배 ${n.toLocaleString()}회 · 표본 비율이며 확정 확률은 아닙니다.</p><div class="metrics">` + [['교배 표본', n.toLocaleString()], ['발견 외형', Object.keys(report.catalog).length], ['암컷 / 수컷', `${report.sexes.F} / ${report.sexes.M}`], ['최다 외형 비율', pct(largest, n)]].map(([label, value]) => `<div class="metric">${label}<strong>${value}</strong></div>`).join('') + '</div><h3>주요 형질</h3>' + Object.entries({ '희석': report.traits.dilute, '장모': report.traits.long, '토티 (전체 표본)': report.traits.tortie, '포인트': report.traits.point, '밍크': report.traits.mink }).map(([label, value]) => histogram(label, value, n)).join('') + '<h3>등급과 별도 추첨</h3>' + report.grades.map((v, i) => histogram(GRADES[i], v, n)).join('') + histogram('SPECIAL', report.special, n) + histogram('판타지', report.fantasy, n) + histogram('의상', report.costume, n) + '<p class="muted">등급 + SPECIAL은 전체 표본입니다. 판타지·의상은 해당 표본과 중복 집계합니다. 토티는 암컷에서만 나옵니다.</p><h3>처음 태어난 아기 8마리</h3><div class="samples">' + report.samples.map(c => `<div class="sample">${picture(c)}<b>${c.sex === 'M' ? '♂' : '♀'} ${gradeLabel(c)}</b><div>${phenotypeName(c.ph)}</div></div>`).join('') + '</div><details><summary>좌위별 자손 유전자형 분포</summary><table><thead><tr><th>좌위</th><th>유전자형</th><th>횟수</th><th>비율</th></tr></thead><tbody>' + Object.entries(report.loci).flatMap(([locus, values]) => Object.entries(values).map(([genotype, value]) => `<tr><td>${locus}</td><td>${esc(genotype)}</td><td>${value}</td><td>${pct(value, n)}</td></tr>`)).join('') + '</tbody></table></details>';
   $('#results').hidden = false;
+  const expected=expectedCross(father,mother);
+  $('#results').insertAdjacentHTML('beforeend',`<h3>이론과 표본 비교</h3><table><thead><tr><th>형질</th><th>이론</th><th>실험</th><th>차이 (%p)</th></tr></thead><tbody>${Object.entries(report.traits).map(([key,value])=>{
+    const difference=100*(value/n-expected.traits[key]);
+    return `<tr data-comparison="${key}"><th scope="row">${traitLabels[key]}</th><td>${percent(expected.traits[key])}</td><td>${pct(value,n)}</td><td>${difference>0?'+':''}${difference.toFixed(1)}</td></tr>`;
+  }).join('')}</tbody></table><p class="muted">표본 오차가 있으므로 실험 비율이 이론과 정확히 일치할 필요는 없어요. 더 많은 표본으로 차이를 비교해 보세요.</p>`);
 }
 function setRunning(value) {
   running = value;

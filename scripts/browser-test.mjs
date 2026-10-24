@@ -39,6 +39,26 @@ try{
       assert.deepEqual(errors,[],`${name}: browser errors`);
       assert.ok(await page.locator('#smokeChecks .ok').count()>=26,'Not all UI checks ran');
       console.log(`${name}: ${await page.locator('#smokeSummary').innerText()}`);
+      await page.screenshot({path:resolve(output,`${name}-game.png`),fullPage:true});
+      await page.goto(`http://127.0.0.1:${server.address().port}/lab.html`);
+      await page.locator('[data-expected="mink"]').waitFor();
+      await page.getByRole('button',{name:'희석 Dd × Dd',exact:true}).click();
+      assert.equal(await page.locator('[data-expected="dilute"]').innerText(),'25.0%');
+      const allele=page.locator('#father select[data-locus="D"][data-index="0"]');
+      await allele.focus();await allele.selectOption('d');
+      assert.equal(await page.locator('[data-expected="dilute"]').innerText(),'50.0%');
+      assert.equal(await page.evaluate(()=>document.activeElement.dataset.locus),'D','Allele edit lost keyboard focus');
+      await page.getByRole('button',{name:'X연관 오렌지',exact:true}).click();
+      assert.equal(await page.locator('[data-expected="tortie"]').innerText(),'50.0%');
+      await page.getByRole('button',{name:'밍크 cb × cs',exact:true}).click();
+      assert.equal(await page.locator('[data-expected="mink"]').innerText(),'100.0%');
+      await page.locator('#run').click();await page.locator('#results:not([hidden])').waitFor({timeout:30000});
+      assert.match(await page.locator('[data-comparison="mink"]').innerText(),/100\.0%\s+100\.0%\s+0\.0/);
+      await page.locator('#count').selectOption('10000');await page.locator('#run').click();await page.locator('#cancel').click();
+      await page.getByRole('heading',{name:'중지한 실험 결과',exact:true}).waitFor();
+      assert.equal(await page.locator('#run').isEnabled(),true,'Cancellation did not restore controls');
+      assert.deepEqual(errors,[],`${name}: lab browser errors`);
+      console.log(`${name}: lab theory, allele editing focus, seeded results and cancellation passed`);
     }finally{
       await page.screenshot({path:resolve(output,`${name}.png`),fullPage:true});
       await context.close();
