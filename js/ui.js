@@ -276,10 +276,11 @@ async function runBreed() {
   const r = doBreed(B.father, B.mother);
   if (r.error) { toast(r.error); return; }
   sound.play('breed');
-  U.busy = true; U.world.enabled = false; U.open = false; render();
-  const ov = $('#breedOverlay'); ov.hidden = false;
-  $('#skipBreed').focus({preventScroll:true});
+  U.busy = true; U.world.enabled = false; U.open = false;
+  const ov = $('#breedOverlay');
   try {
+    render(); ov.hidden = false;
+    $('#skipBreed').focus({preventScroll:true});
     if (!U.stage) U.stage = new Stage($('#breedCanvas'));
     U.stage.resize();
     await U.stage.playBreed(f, m, r.kitten);
@@ -288,6 +289,7 @@ async function runBreed() {
     toast('연출을 표시하지 못했지만 새 가족은 우리집에 안전하게 도착했어요');
   } finally {
     ov.hidden = true; U.busy = false; U.world.enabled = true;
+    backgroundInert(false);
   }
   B.father = null; B.mother = null; B.slot = 'father'; U.sel = r.kitten.id;
   U.tab = 'home'; U.open = true;

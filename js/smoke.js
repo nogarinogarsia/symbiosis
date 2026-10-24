@@ -290,6 +290,29 @@ try {
     assert(JSON.parse(memory.getItem('catgene-save-v1')).mine.includes(U.sel),'건너뛴 새끼 저장');
     click('#modal [data-act="close"]');
   });
+  await check('교배 연출 Tab 초점 격리·Escape 건너뛰기', async () => {
+    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
+    const before=game.G.mine.length;click('#panel [data-act="dobreed"]');
+    const skip=$('#skipBreed');skip.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+    assert(document.activeElement===skip && $('#top').inert,'연출 중 초점 격리');
+    skip.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+    await waitUntil(()=>!U.busy);
+    assert(game.G.mine.length===before+1 && $('#breedOverlay').hidden && !$('#modal').hidden,'Escape 후 탄생 결과');
+    click('#modal [data-act="close"]');
+  });
+  await check('교배 무대 초기화 오류에도 새끼 보존·초점 격리 해제', async () => {
+    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
+    const before=game.G.mine.length,resize=U.stage.resize;
+    try{
+      U.stage.resize=()=>{throw new Error('isolated initialization failure');};
+      click('#panel [data-act="dobreed"]');await waitUntil(()=>!U.busy);
+      assert(game.G.mine.length===before+1 && $('#breedOverlay').hidden && !$('#modal').hidden,'초기화 오류 뒤 결과');
+      assert(JSON.parse(memory.getItem('catgene-save-v1')).mine.includes(U.sel),'초기화 오류 뒤 새끼 저장');
+      click('#modal [data-act="close"]');assert(!$('#top').inert && U.world.enabled,'초기화 오류 뒤 조작 복귀');
+    }finally{U.stage.resize=resize;}
+  });
   await check('교배 프레임 오류에도 새끼 보존·조작 복구', async () => {
     click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');

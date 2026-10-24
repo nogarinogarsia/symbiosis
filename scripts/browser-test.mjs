@@ -37,7 +37,7 @@ try{
       await writeFile(resolve(output,`${name}.txt`),report+'\n\nConsole errors:\n'+errors.join('\n'));
       assert.equal(await page.locator('#smokeChecks .bad').count(),0,report);
       assert.deepEqual(errors,[],`${name}: browser errors`);
-      assert.ok(await page.locator('#smokeChecks .ok').count()>=26,'Not all UI checks ran');
+      assert.ok(await page.locator('#smokeChecks .ok').count()>=28,'Not all UI checks ran');
       console.log(`${name}: ${await page.locator('#smokeSummary').innerText()}`);
       await page.screenshot({path:resolve(output,`${name}-game.png`),fullPage:true});
       await page.goto(`http://127.0.0.1:${server.address().port}/lab.html`);
