@@ -46,6 +46,42 @@ try {
     click('#tabs [data-tab="home"]');
     assert(!$('#panel').hidden && $('#panel').textContent.includes('고양이 4마리'), '우리집 렌더');
   });
+  await check('쉼터 1마리 예약·도착·만석 대체 행동', () => {
+    const world=U.world, all=[...world.catObjs.values()], mine=all.filter(o=>o.pen==='mine');
+    const snapshots=all.map(o=>({o,state:{...o},position:o.holder.position.clone(),rotation:o.holder.rotation.clone()}));
+    try {
+      for(const o of all) {o.moving=false;o.activity='care';o.wait=100;o.partnerId=null;o.shelterId=null;}
+      for(const o of mine.slice(0,3)) {o.personality=1;o.wait=0;}
+      world.updateCats(.01,1000);
+      const [first,second,third]=mine;
+      assert(first.activity==='shelter' && second.activity==='shelter','실제 쉼터 선택');
+      assert(first.shelterId!==second.shelterId && !third.shelterId,'쉼터 중복 예약 방지');
+      assert(world.pens.mine.shelters.every(s=>s.object.parent===world.scene),'쉼터 모델 배치');
+      assert(world.activityOf(first.id)==='조용한 쉼터로 가요','이동 상태');
+      first.holder.position.set(first.tx,0,first.tz);world.updateCats(.01,1000.1);
+      assert(!first.moving && world.activityOf(first.id)==='포근한 쉼터에서 쉬어요','쉼터 도착');
+      world.react(first.id,'pet');assert(!first.shelterId && first.activity==='care','돌봄 시 예약 해제');
+    } finally {for(const {o,state,position,rotation} of snapshots){for(const key of Object.keys(o))if(!(key in state))delete o[key];Object.assign(o,state);o.holder.position.copy(position);o.holder.rotation.copy(rotation);}}
+  });
+  await check('친구 위치 추적·서로 인사·돌봄 중 접근 취소', () => {
+    const world=U.world,all=[...world.catObjs.values()],mine=all.filter(o=>o.pen==='mine');
+    const snapshots=all.map(o=>({o,state:{...o},position:o.holder.position.clone(),rotation:o.holder.rotation.clone()}));
+    try {
+      for(const o of all){o.moving=false;o.activity='care';o.wait=100;o.partnerId=null;o.shelterId=null;}
+      const [a,b]=mine;a.personality=2;a.wait=0;a.socialUntil=b.socialUntil=0;
+      a.holder.position.set(-9,0,2);b.holder.position.set(-7,0,2);b.activity='idle';
+      const random=Math.random;
+      try{Math.random=()=>.1;world.updateCats(.01,1000);}finally{Math.random=random;}
+      assert(a.partnerId===b.id && a.moving,'친구 선택');
+      const oldZ=a.tz;b.holder.position.z=3;world.updateCats(.01,1000.1);
+      assert(a.tz!==oldZ,'움직이는 친구 목적지 갱신');
+      a.holder.position.set(a.tx,0,a.tz);world.updateCats(.01,1000.2);
+      assert(a.activity==='rub' && b.activity==='greet' && !b.moving && !a.partnerId,'서로 마주 보는 인사');
+      assert(a.socialUntil>1000.2 && b.socialUntil>1000.2,'연속 인사 방지');
+      a.partnerId=b.id;a.moving=true;a.chaseUntil=2000;b.activity='care';
+      world.updateCats(.01,1001);assert(!a.partnerId && !a.moving && a.activity==='idle','돌봄 받는 친구 방해 방지');
+    } finally {for(const {o,state,position,rotation} of snapshots){for(const key of Object.keys(o))if(!(key in state))delete o[key];Object.assign(o,state);o.holder.position.copy(position);o.holder.rotation.copy(rotation);}}
+  });
   await check('고양이 카드 네이티브 버튼·선택 상태·재렌더 후 초점', () => {
     const card=$('#panel [data-act="select"]');
     assert(card.tagName==='BUTTON', '고양이 카드 키보드 조작');
@@ -53,6 +89,19 @@ try {
     assert(document.activeElement.dataset.id===id && document.activeElement.dataset.act==='select', '선택 후 초점 유지');
     assert(document.activeElement.getAttribute('aria-pressed')==='true', '고양이 선택 상태 전달');
     assert($('#tabs [data-tab="home"]').getAttribute('aria-expanded')==='true','패널 열림 상태');
+  });
+  await check('배경음악·효과음 개별 음량·설정 저장·자동 재생 없음', async () => {
+    const {sound}=await import('./audio.js');const {loadAudioPreferences}=await import('./preferences.js');
+    click('#panel [data-act="audioSettings"]');
+    assert($('#modal').textContent.includes('소리 설정') && !sound.enabled && !sound.context,'소리 설정만 열면 자동 재생하지 않음');
+    const music=$('#musicVolume');music.value='0';music.dispatchEvent(new Event('input',{bubbles:true}));
+    const effects=$('#effectsVolume');effects.value='27';effects.dispatchEvent(new Event('input',{bubbles:true}));
+    assert($('#musicVolumeValue').textContent==='0%' && $('#effectsVolumeValue').textContent==='27%','음량 표시');
+    assert(sound.volumes.music===0 && sound.volumes.effects===.27,'개별 음량 적용');
+    assert(loadAudioPreferences(memory).effects===.27,'음량 설정 저장');
+    click('#modal [data-act="close"]');click('#panel [data-act="audioSettings"]');
+    assert($('#effectsVolume').value==='27' && $('#musicVolume').value==='0','설정 다시 열기');
+    click('#modal [data-act="close"]');
   });
   await check('상세 대화창 초점 격리·순환·Escape 복귀', () => {
     const opener=$('#panel [data-act="detail"]');opener.focus();opener.click();
@@ -208,6 +257,28 @@ try {
       assert(second.userData.textureSet.body!==texture, '완전 해제 후 새 텍스처 생성');
       assert(second.userData.textureSet.body.image.toDataURL()===pixels, '토티 패치 재생성 일관성');
     } finally {if(first)disposeCat(first);if(second)disposeCat(second);}
+  });
+  await check('교배 연출 건너뛰기·중복 클릭 방지·새끼 저장', async () => {
+    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
+    const before=game.G.mine.length,button=$('#panel [data-act="dobreed"]');button.click();button.click();
+    assert(U.busy && document.activeElement.id==='skipBreed','건너뛰기 초점');
+    click('#skipBreed');await waitUntil(()=>!U.busy);
+    assert(game.G.mine.length===before+1 && !$('#modal').hidden && $('#breedOverlay').hidden,'중복 탄생 없이 결과 복구');
+    assert(JSON.parse(memory.getItem('catgene-save-v1')).mine.includes(U.sel),'건너뛴 새끼 저장');
+    click('#modal [data-act="close"]');
+  });
+  await check('교배 프레임 오류에도 새끼 보존·조작 복구', async () => {
+    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
+    const before=game.G.mine.length;click('#panel [data-act="dobreed"]');
+    U.stage.anim=()=>{throw new Error('isolated animation failure');};U.stage.frame();
+    await waitUntil(()=>!U.busy);
+    assert(game.G.mine.length===before+1 && $('#breedOverlay').hidden && !$('#modal').hidden,'오류 뒤 탄생 결과');
+    assert(!U.stage.breedTask && U.stage.cats.length===0,'실패 무대 정리');
+    assert($('#toasts').textContent.includes('안전하게 도착'),'복구 안내');
+    click('#modal [data-act="close"]');
+    assert(!$('#top').inert && U.world.enabled,'배경 조작 복귀');
   });
   await check('명시적 판매·새 게임 확인 시에만 상태 변경', () => {
     click('#tabs [data-tab="home"]');

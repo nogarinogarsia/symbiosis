@@ -213,10 +213,10 @@ export function buildCat(cat, opts = {}) {
         frontParts[0].leg.rotation.x = -.8; frontParts[0].leg.position.y = .5;
         frontParts[0].paw.position.y = .72; frontParts[0].paw.position.z = .7;
         head.rotation.x = .28 + Math.sin(s * 5) * .08; head.rotation.z = -.12;
-      } else if (activity === 'hide') {
+      } else if (activity === 'hide' || activity === 'shelter') {
         pose.x = .2; head.rotation.x = .18;
         for (const e of eyes) e.scale.y = .65;
-      } else if (activity === 'rub') {
+      } else if (activity === 'rub' || activity === 'greet') {
         pose.z = Math.sin(s * 2) * .18; pose.px = Math.sin(s * 2) * .1;
         for (const e of eyes) e.scale.y = .4;
       } else if (activity === 'pounce') {

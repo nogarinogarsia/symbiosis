@@ -9,6 +9,7 @@ import { comfort, litterState } from './wellbeing.js';
 import { careDaily } from './game.js';
 import { bindTouchControls } from './touch-controls.js';
 import { sound } from './audio.js';
+import { loadAudioPreferences, saveAudioPreferences } from './preferences.js';
 import { trapDialogFocus, rememberPanelFocus } from './focus.js';
 
 const $ = (s) => document.querySelector(s);
@@ -62,6 +63,7 @@ const litterSummary = state => state.total ? `🧹 화장실 청소 ${state.tota
 
 /* ───── 렌더 ───── */
 export function init() {
+  try { sound.setVolumes(loadAudioPreferences(window.localStorage)); } catch { /* storage access may be unavailable */ }
   U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => {
     if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
     else showDetail(id, true);
@@ -71,20 +73,20 @@ export function init() {
     else toast(result.msg);
   } });
   $('#returnCamera').onclick = () => U.world.stopWatching();
+  $('#skipBreed').onclick = () => U.stage?.clear();
   U.world.setupNpcs(G.npcs);
   U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.target = null; });
   document.addEventListener('visibilitychange', () => { sound.visibility(document.hidden).catch(() => toast('소리를 다시 켜 주세요')); });
-  $('#btnSound').onclick = async () => {
-    const button = $('#btnSound'); button.disabled = true;
-    try {
-      const enabled = await sound.setEnabled(!sound.enabled);
-      button.textContent = enabled ? '🔊' : '🔇'; button.setAttribute('aria-pressed', String(enabled));
-      button.setAttribute('aria-label', enabled ? '소리 끄기' : '소리 켜기'); button.title = enabled ? '소리 끄기' : '소리 켜기';
-    } catch (err) { toast(err.message); }
-    finally { button.disabled = false; }
-  };
+  $('#btnSound').onclick = toggleSound;
   document.addEventListener('click', onClick);
   document.addEventListener('input', e => {
+    if (e.target.matches('[data-volume]')) {
+      const key=e.target.dataset.volume;
+      sound.setVolumes({...sound.volumes,[key]:Number(e.target.value)/100});
+      $(`#${key}VolumeValue`).textContent=`${Math.round(sound.volumes[key]*100)}%`;
+      try { if(!saveAudioPreferences(window.localStorage,sound.volumes)) toast('음량을 저장하지 못했어요. 현재 창에는 적용했어요'); }
+      catch { toast('음량을 저장하지 못했어요. 현재 창에는 적용했어요'); }
+    }
     if (e.target.id === 'dexSearch') {
       U.dexSearch = e.target.value; U.dexPage = 1; clearTimeout(dexSearchTimer);
       if (e.isComposing || dexComposing) return;
@@ -97,7 +99,10 @@ export function init() {
     if (e.target.id === 'dexSearch' && e.key === 'Enter' && !e.isComposing && !dexComposing) { clearTimeout(dexSearchTimer); U.dexSearch = e.target.value; U.dexPage = 1; render(); }
   });
   document.addEventListener('keydown', e => {
-    if (!$('#modal').hidden) {
+    if (U.busy && !$('#breedOverlay').hidden) {
+      trapDialogFocus(e, $('#breedOverlay'));
+      if (e.key === 'Escape') { e.preventDefault(); U.stage?.clear(); }
+    } else if (!$('#modal').hidden) {
       trapDialogFocus(e, $('#modal .dialog'));
       if (e.key === 'Escape' && !U.busy) { e.preventDefault(); closeModal(); }
     } else if (e.key === 'Escape' && !U.busy && U.open) { e.preventDefault(); closePanel(); }
@@ -176,7 +181,7 @@ function homeView() {
   let html = `<h2>🏠 우리집 <small class="hint">고양이 ${cats.length}마리 · 하루 수입 ${Math.round(cats.reduce((s, x) => s + incomePerHour(x) * 24, 0))}</small></h2>`;
   const litter = litterState(cats, t);
   html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
-  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button></div>`;
+  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button><button class="btn sm gray" data-act="audioSettings">🎵 소리 설정</button></div>`;
   html += '<p class="hint"><a href="lab.html">🧪 유전 실험실 — 부모 유전자 편집 · 대량 교배 통계</a></p>';
   if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
   if (c) html += detailBox(c, t);
@@ -265,6 +270,7 @@ function srcLabel(c) {
 }
 
 async function runBreed() {
+  if (U.busy) return;
   const B = U.breed;
   const f = cat(B.father), m = cat(B.mother);
   const r = doBreed(B.father, B.mother);
@@ -272,10 +278,17 @@ async function runBreed() {
   sound.play('breed');
   U.busy = true; U.world.enabled = false; U.open = false; render();
   const ov = $('#breedOverlay'); ov.hidden = false;
-  if (!U.stage) U.stage = new Stage($('#breedCanvas'));
-  U.stage.resize();
-  await U.stage.playBreed(f, m, r.kitten);
-  ov.hidden = true; U.busy = false; U.world.enabled = true;
+  $('#skipBreed').focus({preventScroll:true});
+  try {
+    if (!U.stage) U.stage = new Stage($('#breedCanvas'));
+    U.stage.resize();
+    await U.stage.playBreed(f, m, r.kitten);
+  } catch {
+    U.stage?.clear();
+    toast('연출을 표시하지 못했지만 새 가족은 우리집에 안전하게 도착했어요');
+  } finally {
+    ov.hidden = true; U.busy = false; U.world.enabled = true;
+  }
   B.father = null; B.mother = null; B.slot = 'father'; U.sel = r.kitten.id;
   U.tab = 'home'; U.open = true;
   render();
@@ -370,6 +383,25 @@ function confirmDialog(title, message, action) {
   $('#modal .dialog').setAttribute('aria-describedby','confirmDescription');
   pendingConfirm = action;
 }
+function updateSoundButtons() {
+  const button=$('#btnSound');button.textContent=sound.enabled?'🔊':'🔇';
+  button.setAttribute('aria-pressed',String(sound.enabled));
+  button.setAttribute('aria-label',sound.enabled?'소리 끄기':'소리 켜기');button.title=button.getAttribute('aria-label');
+  const toggle=$('#audioToggle');
+  if(toggle){toggle.textContent=sound.enabled?'🔇 소리 끄기':'🔊 소리 켜기';toggle.setAttribute('aria-pressed',String(sound.enabled));}
+}
+async function toggleSound() {
+  const buttons=[$('#btnSound'),$('#audioToggle')].filter(Boolean);buttons.forEach(b=>b.disabled=true);
+  try {await sound.setEnabled(!sound.enabled);updateSoundButtons();}
+  catch(error){toast(error.message);}
+  finally{buttons.forEach(b=>b.disabled=false);}
+}
+function showAudioSettings() {
+  openModal(`<h2>🎵 소리 설정</h2><p class="hint">음량은 이 브라우저에 기억해요. 게임을 다시 열면 소리는 직접 켜 주세요.</p>
+    ${[['music','배경음악'],['effects','효과음']].map(([key,label])=>`<label class="volume-control" for="${key}Volume">${label} <output id="${key}VolumeValue" for="${key}Volume">${Math.round(sound.volumes[key]*100)}%</output><input id="${key}Volume" data-volume="${key}" type="range" min="0" max="100" step="1" value="${Math.round(sound.volumes[key]*100)}"></label>`).join('')}
+    <p class="hint">0%로 내리면 해당 소리만 꺼져요.</p><div class="row"><button class="btn gray" id="audioToggle" data-act="audioToggle"></button><button class="btn" data-act="close">닫기</button></div>`);
+  updateSoundButtons();
+}
 
 const REC = { B: ['b', 'bl'], D: ['d'], A: ['a'], T: ['m'], S: ['s'], C: ['cb', 'cs'], L: ['l'], I: ['i'], O: ['o'] };
 const LOCI_KO = { B: '갈색(B)', D: '희석(D)', A: '아구티(A)', T: '태비(T)', S: '흰반점(S)', C: '색소제한(C)', L: '털길이(L)', I: '실버(I)', O: '오렌지(X^O)', P1: '농도1', P2: '농도2', P3: '농도3' };
@@ -429,6 +461,8 @@ function onClick(e) {
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'audioSettings': showAudioSettings(); break;
+    case 'audioToggle': toggleSound(); break;
     case 'confirm': { const action = pendingConfirm; closeModal(); action?.(); break; }
     case 'focuscat': U.world.focusCat(d.id); closePanel(); break;
     case 'dailycare': {

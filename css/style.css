@@ -108,6 +108,7 @@ body{overflow:hidden}
 #breedOverlay{position:fixed;inset:0;z-index:35;background:linear-gradient(#e7f5ff,#fff6df 62%,#f4d8b0 62%)}
 #breedOverlay[hidden]{display:none}
 #breedCanvas{width:100%;height:100%;display:block}
+#skipBreed{position:absolute;bottom:40px;left:50%;transform:translateX(-50%)}
 #breedOverlay .cap{position:absolute;top:90px;left:50%;transform:translateX(-50%);font-size:28px;background:#fffaf0e8;border:4px solid #fff;border-radius:99px;padding:6px 26px;box-shadow:var(--shadow)}
 
 @media (max-width:760px){
@@ -124,6 +125,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #397f84;outline-offse
 .dex-search input{display:block;width:100%;margin-top:6px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;font:inherit;box-sizing:border-box;background:#fffdf8;color:var(--ink)}
 .recovery{position:fixed;inset:0;z-index:100;background:#e8eedf;display:grid;place-items:center;padding:20px}.recovery .dialog{box-sizing:border-box}.recovery p{line-height:1.7}
 .activity-note{padding:7px 10px;border-radius:12px;background:#edf3e5;color:#58724c;font-size:13px}
+.volume-control{display:block;margin:20px 0}.volume-control output{float:right;color:var(--ink2)}.volume-control input{display:block;width:100%;margin:12px 0;accent-color:#658a6c;min-height:32px}
 #watchingCat{position:fixed;top:105px;left:50%;transform:translateX(-50%);z-index:10;padding:8px 14px;background:#fffaf0ed;border:3px solid white;border-radius:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 38px);box-sizing:border-box;font-size:13px}#watchingCat[hidden]{display:none}#watchingCat small{font-size:11px;color:var(--ink2)}
 @media(max-width:760px){#watchingCat{top:62px;gap:6px;min-width:280px}#watchingCat small{display:none}}
 #touchStick{display:none;position:fixed;left:22px;bottom:116px;width:116px;height:116px;border-radius:50%;border:3px solid #fff9;background:#fff6;z-index:11;touch-action:none;user-select:none;box-sizing:border-box}

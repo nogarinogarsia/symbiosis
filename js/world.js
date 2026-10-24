@@ -1,6 +1,6 @@
 // 3D 월드: 내 우리 + 이웃 우리 + 동물샵·교배집 건물. 플레이어가 걸어 다니며 다가가면 창이 열림.
 import * as THREE from 'three';
-import { behaviorOf, chooseActivity, ACTIVITY_NAMES } from './behavior.js';
+import { behaviorOf, chooseActivity, ACTIVITY_NAMES, socialTarget, canReceiveGreeting } from './behavior.js';
 import { buildCat, disposeCat } from './cat3d.js';
 import { toon } from './cat3d.js';
 import { addLights } from './stage.js';
@@ -145,6 +145,22 @@ export class World {
     for (let z = z0; z <= z1 + 0.01; z += 1.5) { post(x0, z); post(x1, z); }
     const lb = label(name, { scale: 0.95 }); lb.position.set(cx, 3.1, z0 + 0.3); g.add(lb);
     this.pens[id] = { id, cx, cz, w, d, minX: x0 + 1, maxX: x1 - 1, minZ: z0 + 1, maxZ: z1 - 1, gate: { x: cx, z: z1 } };
+    this.buildShelters(this.pens[id]);
+  }
+  buildShelters(pen) {
+    pen.shelters = [-1, 1].map((side, index) => {
+      const x = side < 0 ? pen.minX + .65 : pen.maxX - .65, z = pen.minZ + .55;
+      const hut = new THREE.Group(); hut.position.set(x, 0, z);
+      box(2.1, .12, 1.75, 0xd6ad83, 0, .04, 0, hut);
+      const cushion = new THREE.Mesh(new THREE.CylinderGeometry(.72,.78,.12,24),toon(0xf4c6cd));
+      cushion.position.y = .22; cushion.scale.z = .8; hut.add(cushion);
+      for (const dx of [-.91,.91]) for (const dz of [-.7,.7]) box(.12,1.6,.12,0xc99a66,dx,.12,dz,hut);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(1.55,.65,4),toon(0xa9cbb9));
+      roof.rotation.y = Math.PI/4; roof.scale.z = .85; roof.position.y = 1.92; hut.add(roof);
+      const sign = label('🌿 조용한 쉼터',{scale:.48});sign.position.set(0,2.65,0);hut.add(sign);
+      this.scene.add(hut);
+      return {id:`${pen.id}:shelter:${index}`,x,z,object:hut};
+    });
   }
   buildPens() {
     this.buildPen('mine', -9, 2, 12, 9, '🏠 우리 집', 0xf5e6b8);
@@ -304,7 +320,7 @@ export class World {
       holder.userData.catId = d.cat.id;
       this.scene.add(holder);
       const behavior = behaviorOf(d.cat);
-      this.catObjs.set(d.cat.id, { holder, root, behavior, personality: d.cat.personality, activity: 'idle', duration: behavior.rest,
+      this.catObjs.set(d.cat.id, { id: d.cat.id, holder, root, behavior, personality: d.cat.personality, activity: 'idle', duration: behavior.rest,
         pen: d.pen, key: this.keyOf(d.cat), wait: Math.random() * behavior.rest, tx: 0, tz: 0, moving: false, speed: behavior.speed });
     }
     if (this.followCatId && !this.catObjs.has(this.followCatId)) this.stopWatching();
@@ -314,9 +330,14 @@ export class World {
     const o = this.catObjs.get(id);
     if (!o) return;
     o.root.userData.react?.(action);
-    o.moving = false; o.wait = 5; o.activity = 'care';
+    o.moving = false; o.wait = 5; o.activity = 'care'; o.partnerId = null; o.shelterId = null;
   }
-  activityOf(id) { return ACTIVITY_NAMES[this.catObjs.get(id)?.activity] ?? ACTIVITY_NAMES.idle; }
+  activityOf(id) {
+    const o = this.catObjs.get(id);
+    if (o?.moving && o.activity === 'shelter') return '조용한 쉼터로 가요';
+    if (o?.moving && o.partnerId) return '친구에게 다가가요';
+    return ACTIVITY_NAMES[o?.activity] ?? ACTIVITY_NAMES.idle;
+  }
   focusCat(id) { if (this.catObjs.has(id)) { this.followCatId = id; this.orbit = 0; this.target = null; this.keys = {}; this.hooks.onFocus?.(id); } }
   stopWatching() { if (!this.followCatId) return; this.followCatId = null; this.hooks.onFocus?.(null); }
 
@@ -374,15 +395,40 @@ export class World {
         root.position.y = 0;
         root.rotation.z = 0;
         if (o.wait <= 0) {
-          const peers = [...this.catObjs.values()].filter(p => p !== o && p.pen === o.pen).map(p => ({ x: p.holder.position.x, z: p.holder.position.z }));
-          const plan = chooseActivity(o.personality, h.position, peers, pen);
+          const neighbors = [...this.catObjs.values()].filter(p => p !== o && p.pen === o.pen);
+          const peers = neighbors.filter(p => ![2,6].includes(o.personality) || (canReceiveGreeting(p.activity) && (p.socialUntil ?? 0) <= t))
+            .map(p => ({ id:p.id, x: p.holder.position.x, z: p.holder.position.z }));
+          const shelters = pen.shelters.filter(s => !neighbors.some(p => p.shelterId === s.id));
+          const plan = chooseActivity(o.personality, h.position, peers, pen, Math.random, shelters);
           o.activity = plan.kind; o.duration = plan.duration;
+          o.partnerId = plan.partnerId; o.shelterId = plan.shelterId; o.chaseUntil = t + 8;
           o.wait = plan.duration;
           if (plan.target) { o.tx = plan.target.x; o.tz = plan.target.z; o.moving = true; }
         }
       } else {
+        if (o.partnerId) {
+          const friend = this.catObjs.get(o.partnerId);
+          if (!friend || friend.pen !== o.pen || !canReceiveGreeting(friend.activity) || (friend.socialUntil ?? 0) > t || t > o.chaseUntil) {
+            o.partnerId = null; o.moving = false; o.activity = 'idle'; o.wait = 1;
+          } else {
+            const destination = socialTarget(h.position,friend.holder.position,pen);
+            o.tx = destination.x; o.tz = destination.z;
+          }
+        }
+        if (!o.moving) { root.userData.tick?.(t,{activity:o.activity,moving:false,dt}); continue; }
         const ex = o.tx - h.position.x, ez = o.tz - h.position.z, dist = Math.hypot(ex, ez);
-        if (dist < 0.15) { o.moving = false; o.wait = o.duration; root.position.y = 0; root.rotation.z = 0; }
+        if (dist < 0.15) {
+          o.moving = false; o.wait = o.duration; root.position.y = 0; root.rotation.z = 0;
+          const friend = this.catObjs.get(o.partnerId);
+          if (friend) {
+            friend.moving = false; friend.activity = 'greet'; friend.wait = o.duration;
+            friend.partnerId = null; friend.shelterId = null;
+            friend.socialUntil = o.socialUntil = t + o.duration + 6;
+            h.rotation.y = Math.atan2(friend.holder.position.x-h.position.x,friend.holder.position.z-h.position.z);
+            friend.holder.rotation.y = h.rotation.y + Math.PI;
+          }
+          o.partnerId = null;
+        }
         else {
         const ang = Math.atan2(ex, ez);
         let da = ang - h.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); h.rotation.y += da * Math.min(1, dt * 6);
