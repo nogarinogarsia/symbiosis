@@ -13,7 +13,7 @@ export function trapDialogFocus(event, dialog) {
 export function rememberPanelFocus(panel) {
   const active = document.activeElement;
   if (!panel.contains(active)) return () => {};
-  const keys = ['act','id','a','slot','src','g','tab','my','npc'];
+  const keys = ['act','id','a','slot','src','g','tab','my','npc','parent','locus','index'];
   const attributes = Object.fromEntries(keys.filter(key=>active.dataset[key]!==undefined).map(key=>[key,active.dataset[key]]));
   const id = active.id;
   const selection = typeof active.selectionStart === 'number' ? [active.selectionStart,active.selectionEnd] : null;

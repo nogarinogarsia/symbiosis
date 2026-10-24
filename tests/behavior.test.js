@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseActivity } from '../js/behavior.js';
+import { chooseActivity, socialTarget, canReceiveGreeting } from '../js/behavior.js';
 import { RNG } from '../js/rng.js';
 
 const pen = {minX:-4,maxX:4,minZ:-3,maxZ:3};
@@ -40,4 +40,21 @@ test('social personalities can act alone and handle overlapping cats', () => {
     const together=chooseActivity(personality,{x:0,z:0},[{x:0,z:0}],pen,()=>.1);
     assert.ok(Number.isFinite(together.target.x) && Number.isFinite(together.target.z));
   }
+});
+
+test('shy cats use the quietest available shelter and do not mutate the shelter list', () => {
+  const shelters=[{id:'near',x:3,z:2},{id:'far',x:-3,z:-2}];
+  const plan=chooseActivity(1,{x:0,z:0},[{x:3,z:2}],pen,()=>.9,shelters);
+  assert.equal(plan.kind,'shelter');assert.equal(plan.shelterId,'far');
+  assert.deepEqual(plan.target,{x:-3,z:-2});assert.equal(shelters[0].id,'near');
+  assert.equal(chooseActivity(1,{x:0,z:0},[],pen,()=>.9,[]).kind,'hide');
+});
+test('social targets follow moving partners, clamp at fences, and keep partner identity', () => {
+  const start={x:0,z:0}, friend={id:'friend',x:2,z:0};
+  assert.equal(chooseActivity(2,start,[friend],pen,()=>.1).partnerId,'friend');
+  assert.deepEqual(socialTarget(start,friend,pen),{x:1.2,z:0});
+  assert.notDeepEqual(socialTarget(start,{...friend,z:2},pen),socialTarget(start,friend,pen));
+  assert.deepEqual(socialTarget({x:10,z:3},{x:4,z:3},pen),{x:4,z:3});
+  for(const activity of ['nap','hide','shelter','care','rub','pounce','greet']) assert.equal(canReceiveGreeting(activity),false);
+  assert.equal(canReceiveGreeting('roam'),true);
 });

@@ -1,13 +1,17 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><title>고양이 렌더 확인</title>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>고양이 렌더 확인</title>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <style>body{margin:0;background:linear-gradient(#fdf1d8,#f7dcc0);font:13px system-ui;color:#4a3b2a}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;padding:10px}
-.c{background:#fff8;border-radius:14px;padding:4px;text-align:center}.c img{width:100%}</style></head>
-<body><div id="grid"></div>
+.c{background:#fff8;border-radius:14px;padding:4px;text-align:center}.c img{width:100%}
+header{padding:16px;max-width:760px;margin:auto}header p{line-height:1.6}#motionView{height:320px;border-radius:22px;background:#fff8;overflow:hidden}#motionCanvas{width:100%;height:100%;touch-action:none}button,select{font:inherit;border:2px solid #d8bea0;background:#fffaf0;border-radius:10px;padding:8px;margin:4px}button:focus-visible,select:focus-visible{outline:3px solid #397f84}#motionName{font-weight:bold}</style></head>
+<body><header><h1>고양이 외형·동작 갤러리</h1><p>게임 진행과 분리된 미리보기입니다. 아래 개체의 동작 보기 버튼으로 모델을 바꾸고, 화면을 드래그해 회전해 보세요.</p><label for="motion">동작 </label><select id="motion"><option value="idle">기본 자세</option><option value="walk">네 발 걷기</option><option value="nap">낮잠</option><option value="groom">그루밍</option><option value="shelter">쉼터에서 쉬기</option><option value="rub">얼굴 비비기</option><option value="greet">친구 인사</option><option value="pounce">장난</option><option value="alert">경계</option></select><p id="motionName"></p><div id="motionView"><canvas id="motionCanvas" aria-label="선택한 고양이 동작 미리보기"></canvas></div></header><div id="grid"></div>
 <script type="module">
 import { createFounder, refreshCat, phenotypeName, COSTUMES } from './js/engine.js';
-import { thumbnail } from './js/stage.js';
+import { Stage, thumbnail } from './js/stage.js';
+const stage = new Stage(document.getElementById('motionCanvas'));
+document.getElementById('motion').onchange = e => {stage.motion={activity:e.target.value==='walk'?'roam':e.target.value,moving:e.target.value==='walk'};};
+function preview(c){stage.showCat(c);document.getElementById('motionName').textContent=`${c.name} · ${c.special || c.fantasy || c.costume || phenotypeName(c.ph)}`;}
 const g = document.getElementById('grid');
 const q = new URLSearchParams(location.search);
 const list = [];
@@ -26,6 +30,8 @@ for (const c of list) {
   const d = document.createElement('div'); d.className = 'c';
   d.innerHTML = `<img src="${thumbnail(c, 190)}"><div>${c.name} ${c.sex === 'M' ? '♂' : '♀'} P${c.personality}<br><small>${c.special || c.fantasy || c.costume || phenotypeName(c.ph)}</small></div>`;
   g.appendChild(d);
+  const button=document.createElement('button');button.type='button';button.textContent='동작 보기';button.setAttribute('aria-label',`${c.name} 동작 보기`);button.onclick=()=>{preview(c);document.getElementById('motion').focus();window.scrollTo({top:0,behavior:'instant'});};d.appendChild(button);
 }
+preview(list[0]);
 document.title = 'ready';
 </script></body></html>

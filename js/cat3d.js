@@ -37,6 +37,7 @@ function addPart(parent, geo, mat, { pos = [0, 0, 0], scale = [1, 1, 1], rot = [
 
 /* 솜털: 같은 메시를 법선 방향으로 조금씩 부풀린 반투명 셸을 겹쳐 가장자리가 솜처럼 보이게 함 */
 function addFur(parent, geo, map, alphaMap, opts, shells = 6, len = 0.1) {
+  const layers = [];
   for (let i = 1; i <= shells; i++) {
     const k = i / shells;
     const m = new THREE.MeshToonMaterial({ map, gradientMap: gradient(), alphaMap, alphaTest: 0.12 + 0.78 * k });
@@ -49,7 +50,9 @@ function addFur(parent, geo, map, alphaMap, opts, shells = 6, len = 0.1) {
     const mesh = new THREE.Mesh(geo, m);
     mesh.position.set(...(opts.pos || [0, 0, 0])); mesh.scale.set(...(opts.scale || [1, 1, 1])); mesh.rotation.set(...(opts.rot || [0, 0, 0]));
     parent.add(mesh);
+    layers.push(mesh);
   }
+  return layers;
 }
 const sphere = (r = 1) => new THREE.SphereGeometry(r, 28, 20);
 
@@ -60,6 +63,7 @@ export function buildCat(cat, opts = {}) {
   const long = app.long && !app.hairless;
   const root = new THREE.Group();
   root.userData.textureSet = tex;
+  root.userData.ownedTextures = new Set();
   try {
   const rig = new THREE.Group(); root.add(rig);
 
@@ -79,15 +83,17 @@ export function buildCat(cat, opts = {}) {
   // 몸통
   const bodyGeo = sphere(); bodyGeo.rotateX(Math.PI / 2); // 극을 앞뒤축으로: 등 중앙선을 따라 줄무늬가 균일하게 배열
   const body = addPart(rig, bodyGeo, matBody, { pos: [0, 0.62, 0], scale: [wK, hK, dK] });
+  const bodyLayers = [body];
   // 다리 / 엉덩이
   const legGeo = new THREE.CapsuleGeometry(0.11, 0.32, 6, 12);
-  const frontParts = [];
+  const frontParts = [], hindParts = [];
   for (const s of [-1, 1]) {
     const leg = addPart(rig, legGeo, matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.32, 0.5] });
     const paw = addPart(rig, sphere(), matLegs, { pos: [s * 0.2 * (wK / 0.55) ** 0.5, 0.08, 0.58], scale: [0.14, 0.09, 0.19], outline: 0.02 });
     frontParts.push({ leg, paw, side: s });
-    addPart(rig, sphere(), matThigh, { pos: [s * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44], outline: 0.026 });
-    addPart(rig, sphere(), matLegs, { pos: [s * wK * 0.7, 0.08, 0.2], scale: [0.14, 0.09, 0.22], outline: 0.02 });
+    const thigh = addPart(rig, sphere(), matThigh, { pos: [s * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44], outline: 0.026 });
+    const pawBack = addPart(rig, sphere(), matLegs, { pos: [s * wK * 0.7, 0.08, 0.2], scale: [0.14, 0.09, 0.22], outline: 0.02 });
+    hindParts.push({thigh,layers:[thigh],paw:pawBack,side:s});
   }
 
   // 꼬리
@@ -139,6 +145,7 @@ export function buildCat(cat, opts = {}) {
   const mg = mouthC.getContext('2d'); mg.strokeStyle = '#4a3330'; mg.lineWidth = 7; mg.lineCap = 'round';
   mg.beginPath(); mg.moveTo(64, 4); mg.lineTo(64, 20); mg.moveTo(64, 20); mg.quadraticCurveTo(48, 40, 30, 24); mg.moveTo(64, 20); mg.quadraticCurveTo(80, 40, 98, 24); mg.stroke();
   const mouthT = new THREE.CanvasTexture(mouthC); mouthT.colorSpace = THREE.SRGBColorSpace;
+  root.userData.ownedTextures.add(mouthT);
   const mouth = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.08), new THREE.MeshBasicMaterial({ map: mouthT, transparent: true, polygonOffset: true, polygonOffsetFactor: -2 }));
   mouth.position.set(0, -0.15, 0.482); head.add(mouth);
   // 장모: 뺨 털/가슴 털
@@ -150,9 +157,9 @@ export function buildCat(cat, opts = {}) {
   // 장모: 솜털 셸
   if (long) {
     const a = furAlpha(THREE, 'body', false), ah = furAlpha(THREE, 'head', true);
-    addFur(rig, bodyGeo, tex.body, a, { pos: [0, 0.62, 0], scale: [wK, hK, dK] }, 6, 0.11);
+    bodyLayers.push(...addFur(rig, bodyGeo, tex.body, a, { pos: [0, 0.62, 0], scale: [wK, hK, dK] }, 6, 0.11));
     addFur(head, sphere(), tex.head, ah, { scale: [0.55 * fw, 0.47, 0.5] }, 6, 0.1);
-    for (const sd of [-1, 1]) addFur(rig, sphere(), tex.thigh, a, { pos: [sd * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44] }, 4, 0.08);
+    for (const hind of hindParts) hind.layers.push(...addFur(rig, sphere(), tex.thigh, a, { pos: [hind.side * wK * 0.78, 0.34, -0.2], scale: [0.27, 0.33, 0.44] }, 4, 0.08));
     const tg = tailGroup.children[0];
     if (tg && tg.geometry) addFur(tailGroup, tg.geometry, tex.tail, a, {}, 5, 0.1);
   }
@@ -184,13 +191,23 @@ export function buildCat(cat, opts = {}) {
   const yarn = addPart(rig, sphere(.18), toon(0xf09fbc), { pos: [0, .2, 1.35], outline: 0 });
   yarn.visible = false;
   let reaction = null;
+  let walkBlend = 0, walkPhase = 0;
   root.userData.react = action => { reaction = { action, start: performance.now() }; };
   const t0 = Math.random() * 10;
   root.userData.tick = (t, { activity = 'idle', moving = false, dt = 1 / 60 } = {}) => {
     const s = t + t0;
-    body.scale.y = hK * (1 + Math.sin(s * 1.8) * 0.014);
+    const blend = 1 - Math.exp(-Math.min(.05, dt) * 9);
+    walkBlend = THREE.MathUtils.lerp(walkBlend, moving ? 1 : 0, blend);
+    if(moving)walkPhase += Math.min(.05,dt) * (6 + behavior.speed * 3);
+    for(const layer of bodyLayers){
+      layer.position.y = .62 + walkBlend * .12;
+      layer.scale.y = hK * (1 - walkBlend * .28) * (1 + Math.sin(s * 1.8) * .014);
+      layer.scale.z = dK * (1 + walkBlend * .1);
+    }
     head.rotation.z = Math.sin(s * 0.9) * behavior.sway;
-    head.position.y = 1.28 + Math.sin(s * 1.8) * 0.01;
+    head.position.y = 1.28 - walkBlend * .18 + Math.sin(s * 1.8) * .01;
+    head.position.z = .2 + walkBlend * .43;
+    tailGroup.position.y = .25 + walkBlend * .3;
     tailGroup.rotation.y = Math.sin(s * behavior.speed * 1.6) * behavior.tail;
     const blink = (s % 4.2) > 4.05 ? 0.1 : 1;
     for (const e of eyes) e.scale.y = blink;
@@ -200,9 +217,20 @@ export function buildCat(cat, opts = {}) {
     const pose = { x: 0, z: 0, y: 0, px: 0 };
     head.rotation.x = 0; head.rotation.y = 0;
     for (const { leg, paw, side } of frontParts) {
-      const swing = moving ? Math.sin(t * 9 + side * Math.PI / 2) : 0;
-      leg.rotation.x = swing * .3; leg.position.y = .32;
-      paw.position.set(paw.position.x, .08 + Math.max(0, swing) * .12, .58 + swing * .1);
+      const swing = Math.sin(walkPhase + side * Math.PI / 2) * walkBlend;
+      leg.rotation.x = swing * .45; leg.position.y = .32;
+      leg.position.z = .5 + walkBlend * .15 + swing * .08;
+      paw.position.set(paw.position.x, .08 + Math.max(0, swing) * .15, .58 + walkBlend * .14 + swing * .2);
+    }
+    for(const {layers,paw,side} of hindParts){
+      const swing = -Math.sin(walkPhase + side * Math.PI / 2) * walkBlend;
+      for(const layer of layers){
+        layer.position.z = -.2 - walkBlend * .35 + swing * .06;
+        layer.position.y = .34 + walkBlend * .02;
+        layer.scale.set(.27 - walkBlend * .07,.33,.44 - walkBlend * .18);
+        layer.rotation.x = swing * .35;
+      }
+      paw.position.set(paw.position.x,.08+Math.max(0,swing)*.15,.2-walkBlend*.78+swing*.2);
     }
     if (!active && !moving) {
       if (activity === 'nap') {
@@ -213,10 +241,10 @@ export function buildCat(cat, opts = {}) {
         frontParts[0].leg.rotation.x = -.8; frontParts[0].leg.position.y = .5;
         frontParts[0].paw.position.y = .72; frontParts[0].paw.position.z = .7;
         head.rotation.x = .28 + Math.sin(s * 5) * .08; head.rotation.z = -.12;
-      } else if (activity === 'hide') {
+      } else if (activity === 'hide' || activity === 'shelter') {
         pose.x = .2; head.rotation.x = .18;
         for (const e of eyes) e.scale.y = .65;
-      } else if (activity === 'rub') {
+      } else if (activity === 'rub' || activity === 'greet') {
         pose.z = Math.sin(s * 2) * .18; pose.px = Math.sin(s * 2) * .1;
         for (const e of eyes) e.scale.y = .4;
       } else if (activity === 'pounce') {
@@ -239,13 +267,12 @@ export function buildCat(cat, opts = {}) {
         for (const e of eyes) e.scale.y = .35;
       }
     }
-    const blend = 1 - Math.exp(-Math.min(.05, dt) * 9);
     rig.rotation.x = THREE.MathUtils.lerp(rig.rotation.x, pose.x, blend);
     rig.rotation.z = THREE.MathUtils.lerp(rig.rotation.z, pose.z, blend);
     rig.position.x = THREE.MathUtils.lerp(rig.position.x, pose.px, blend);
     rig.position.y = THREE.MathUtils.lerp(rig.position.y, pose.y, blend);
   };
-  root.userData.parts = { rig, head, tailGroup, app };
+  root.userData.parts = { rig, head, tailGroup, app, bodyLayers, frontParts, hindParts };
   return root;
   } catch (error) { disposeCat(root); throw error; }
 }
@@ -337,6 +364,8 @@ export function disposeCat(root) {
   });
   geometries.forEach(g => g.dispose());
   materials.forEach(m => m.dispose());
+  root.userData.ownedTextures?.forEach(texture=>texture.dispose());
+  root.userData.ownedTextures?.clear();
   if (root.userData.textureSet) { releasePartTextures(root.userData.textureSet); root.userData.textureSet = null; }
 }
 void mix;

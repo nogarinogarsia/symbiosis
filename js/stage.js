@@ -54,6 +54,8 @@ export class Stage {
     this.wide = w / h;
   }
   clear() {
+    const pending = this.breedTask; this.breedTask = null;
+    pending?.resolve();
     for (const o of [...this.cats.map((c) => c.root), ...this.extras]) { this.scene.remove(o); disposeCat(o); }
     this.cats = []; this.extras = []; this.anim = null; this.spin = 0;
   }
@@ -74,19 +76,25 @@ export class Stage {
   }
   frame() {
     if (document.hidden || this.canvas.closest('[hidden]')) return;
-    const t = this.clock.getElapsedTime();
-    for (const c of this.cats) {
-      c.root.userData.tick?.(t);
-      if (!this.anim && this.cats.length === 1) c.root.rotation.y = c.face + this.spin;
+    try {
+      const t = this.clock.getElapsedTime();
+      for (const c of this.cats) {
+        c.root.userData.tick?.(t, this.motion ?? {});
+        if (!this.anim && this.cats.length === 1) c.root.rotation.y = c.face + this.spin;
+      }
+      if (this.anim) this.anim(t);
+      this.renderer.render(this.scene, this.camera);
+    } catch (error) {
+      const pending = this.breedTask; this.breedTask = null; this.anim = null;
+      if (pending) pending.reject(error); else throw error;
     }
-    if (this.anim) this.anim(t);
-    this.renderer.render(this.scene, this.camera);
   }
 
   /* 교배 연출: 두 고양이가 집에 들어간 뒤, 잠시 두근두근 후 아기와 함께 등장 */
   playBreed(f, m, kitten) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.clear(); this.rug.visible = true;
+      this.breedTask = {resolve,reject};
       this.camera.position.set(0, 2.3, 9.0); this.camera.lookAt(0, 0.9, 0);
       const house = new THREE.Group();
       const walls = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.2, 1.3), toon(0xf6e4c4)); walls.position.y = 0.6; house.add(walls);
@@ -128,7 +136,7 @@ export class Stage {
           this.camera.position.lerp(new THREE.Vector3(0, 1.9, 5.2), 0.03);
           this.camera.lookAt(0, 0.8, 0.4);
         }
-        if (t > 5.0) { this.anim = null; this.clear(); this.showCat(kitten); resolve(); }
+        if (t > 5.0) this.clear();
       };
     });
   }

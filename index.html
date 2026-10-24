@@ -34,7 +34,7 @@
   <button data-tab="npc"><span>🏘️</span>이웃</button>
   <button data-tab="dex"><span>📖</span>도감</button>
 </nav>
-<div id="breedOverlay" hidden><canvas id="breedCanvas"></canvas><div class="cap">두근두근… 💞</div></div>
+<div id="breedOverlay" role="dialog" aria-modal="true" aria-label="새 가족 탄생 연출" hidden><canvas id="breedCanvas"></canvas><div class="cap">두근두근… 💞</div><button id="skipBreed" class="btn gray">연출 건너뛰기</button></div>
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 <div id="modal" hidden></div>
 <input type="file" id="saveFile" accept="application/json,.json" hidden>
