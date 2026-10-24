@@ -396,7 +396,7 @@ export class World {
         root.rotation.z = 0;
         if (o.wait <= 0) {
           const neighbors = [...this.catObjs.values()].filter(p => p !== o && p.pen === o.pen);
-          const peers = neighbors.filter(p => ![2,6].includes(o.personality) || (canReceiveGreeting(p.activity) && (p.socialUntil ?? 0) <= t))
+          const peers = neighbors.filter(p => ![2,6].includes(o.personality) || ((o.socialUntil ?? 0) <= t && canReceiveGreeting(p.activity) && (p.socialUntil ?? 0) <= t))
             .map(p => ({ id:p.id, x: p.holder.position.x, z: p.holder.position.z }));
           const shelters = pen.shelters.filter(s => !neighbors.some(p => p.shelterId === s.id));
           const plan = chooseActivity(o.personality, h.position, peers, pen, Math.random, shelters);

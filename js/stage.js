@@ -79,7 +79,7 @@ export class Stage {
     try {
       const t = this.clock.getElapsedTime();
       for (const c of this.cats) {
-        c.root.userData.tick?.(t);
+        c.root.userData.tick?.(t, this.motion ?? {});
         if (!this.anim && this.cats.length === 1) c.root.rotation.y = c.face + this.spin;
       }
       if (this.anim) this.anim(t);

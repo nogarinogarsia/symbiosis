@@ -78,6 +78,8 @@ try {
       a.holder.position.set(a.tx,0,a.tz);world.updateCats(.01,1000.2);
       assert(a.activity==='rub' && b.activity==='greet' && !b.moving && !a.partnerId,'서로 마주 보는 인사');
       assert(a.socialUntil>1000.2 && b.socialUntil>1000.2,'연속 인사 방지');
+      a.wait=0;a.activity=b.activity='idle';world.updateCats(.01,1000.3);
+      assert(!a.partnerId,'인사를 건 개체도 연속 인사 쿨다운');
       a.partnerId=b.id;a.moving=true;a.chaseUntil=2000;b.activity='care';
       world.updateCats(.01,1001);assert(!a.partnerId && !a.moving && a.activity==='idle','돌봄 받는 친구 방해 방지');
     } finally {for(const {o,state,position,rotation} of snapshots){for(const key of Object.keys(o))if(!(key in state))delete o[key];Object.assign(o,state);o.holder.position.copy(position);o.holder.rotation.copy(rotation);}}
@@ -241,6 +243,26 @@ try {
       assert(live.body.image.toDataURL()===pixels, '라이브 개체의 무늬 변경');
       U.world.frame();
     } finally {live.body.removeEventListener('dispose',disposed);}
+  });
+  await check('네 발 보행·장모 셸 정렬·기본 자세 복귀·개별 입 텍스처 해제', async () => {
+    const {buildCat,disposeCat}=await import('./cat3d.js');const {createFounder,refreshCat}=await import('./engine.js');
+    for(const long of [false,true]){
+      const base=createFounder(`walk-smoke-${long}`,{specialChance:0,personality:0});base.genome.L=long?['l','l']:['L','L'];const c=refreshCat(base);
+      const original=JSON.stringify(c),root=buildCat(c),parts=root.userData.parts;
+      const mouth=[...root.userData.ownedTextures][0];let releases=0;mouth.addEventListener('dispose',()=>releases++);
+      try{
+        assert(parts.bodyLayers.length===(long?7:1),'장모/단모 별도 모델 생성');
+        for(let i=0;i<60;i++)root.userData.tick(i/60,{moving:true,dt:1/60});
+        assert(parts.head.position.z>.6 && parts.hindParts.every(p=>p.paw.position.z<-.3),'네 발 자세');
+        assert(parts.frontParts.every(p=>p.paw.position.z>.5),'앞발 위치');
+        assert(parts.bodyLayers.every(layer=>Math.abs(layer.scale.y-parts.bodyLayers[0].scale.y)<1e-10),'장모 몸통 셸 정렬');
+        assert(parts.hindParts.every(p=>p.layers.every(layer=>layer.position.z===p.thigh.position.z)),'장모 뒷다리 셸 정렬');
+        for(let i=0;i<120;i++)root.userData.tick(1+i/60,{moving:false,dt:1/60});
+        assert(Math.abs(parts.head.position.z-.2)<1e-6 && parts.hindParts.every(p=>Math.abs(p.paw.position.z-.2)<1e-6),'기본 자세 복귀');
+        assert(JSON.stringify(c)===original,'유전·개체 정보 보존');
+      }finally{disposeCat(root);disposeCat(root);}
+      assert(releases===1 && root.userData.ownedTextures.size===0,'전용 입 텍스처 1회 해제');
+    }
   });
   await check('토티 털 텍스처를 완전히 해제·재생성해도 픽셀 유지', async () => {
     const {buildCat,disposeCat}=await import('./cat3d.js');
