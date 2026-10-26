@@ -202,6 +202,12 @@ try {
     U.stage.frame();
     assert(U.stage.renderer.info.render.frame === frame, '숨겨진 무대 렌더');
   });
+  await check('연출 뒤에 가려진 월드 렌더 중지·복귀',()=>{
+    const world=U.world,frame=world.renderer.info.render.frame;
+    try{world.suspended=true;world.frame();assert(world.renderer.info.render.frame===frame,'가려진 월드 렌더 중지');}
+    finally{world.suspended=false;}
+    world.frame();assert(world.renderer.info.render.frame>frame,'월드 렌더 복귀');
+  });
   await check('한글 조합 보호·실시간 검색 초점 유지→검색 해제', async () => {
     visit('dex');
     const input = $('#dexSearch'); input.focus();input.value = 'no-result-smoke-xyz';
@@ -377,6 +383,8 @@ try {
     assert(game.checkBreed(parents.find(c=>c.sex==='M'),parents.find(c=>c.sex==='F')).includes('정원'),'초과 교배 차단');
     assert(JSON.stringify(game.G)===before,'차단 시 진행 보존');
     visit('home');assert($('#panel').textContent.includes('정원 1마리 초과'),'초과 안내');click('#btnIncome');
+    // Low-income random founders may need more than one capped day to afford level three.
+    for(let day=0;day<8&&game.G.coins<game.penStatus().next.cost;day++){click('[data-dev="1d"]');click('#btnIncome');}
     click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
     assert(game.penStatus().capacity===11&&game.penStatus().over===0&&game.G.mine.length===9,'확장해 모든 고양이 보존');
   });

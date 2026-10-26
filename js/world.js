@@ -391,7 +391,8 @@ export class World {
 
   /* ───── 프레임 ───── */
   frame() {
-    const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
+    if(document.hidden||this.suspended){this.clock.getDelta();return;}
+    const dt = Math.min(0.1, this.clock.getDelta()), t = this.clock.elapsedTime;
     this.movePlayer(dt, t);
     const followed = this.catObjs.get(this.followCatId);
     const anchor = followed ? followed.holder.position : this.player.position;

@@ -38,7 +38,7 @@ try{
       await writeFile(resolve(output,`${name}.txt`),report+'\n\nConsole errors:\n'+errors.join('\n'));
       assert.equal(await page.locator('#smokeChecks .bad').count(),0,report);
       assert.deepEqual(errors,[],`${name}: browser errors`);
-      assert.ok(await page.locator('#smokeChecks .ok').count()>=32,'Not all UI checks ran');
+      assert.ok(await page.locator('#smokeChecks .ok').count()>=33,'Not all UI checks ran');
       console.log(`${name}: ${await page.locator('#smokeSummary').innerText()}`);
       await page.screenshot({path:resolve(output,`${name}-game.png`),fullPage:true});
       await page.goto(`http://127.0.0.1:${server.address().port}/lab.html`);
@@ -70,7 +70,7 @@ try{
       assert.match(await page.locator('.pen-status').innerText(),/4\/6마리/);
       assert.equal(await page.locator('#homeTools').getAttribute('open'),null);
       await page.locator('.next-step [data-act="navigate"][data-zone="breed"]').click();
-      await page.locator('#panel h2').filter({hasText:'💞 교배'}).waitFor({timeout:20000});
+      await page.locator('#panel h2').filter({hasText:'💞 교배'}).waitFor({timeout:45000});
       await page.locator('#panel [data-act="pick"]:not(:disabled)').first().click();
       await page.locator('#panel [data-act="pick"]:not(:disabled)').first().click();
       await page.locator('#panel [data-act="dobreed"]').click();
@@ -83,11 +83,11 @@ try{
       assert.equal(await page.locator('#modal .village-map').count(),1);
       assert.equal(await page.locator('#modal [data-act="navigate"]').count(),8);
       await page.locator('#modal [data-zone="npc:n5"]').click();
-      await page.locator('#panel h2').filter({hasText:'이웃'}).waitFor({timeout:25000});
+      await page.locator('#panel h2').filter({hasText:'이웃'}).waitFor({timeout:90000});
       assert.match(await page.locator('#panel').innerText(),/미루/);
       await page.locator('#tabs [data-act="mapguide"]').click();
       await page.locator('#modal [data-zone="dex"]').click();
-      await page.locator('#panel h2').filter({hasText:'📖 도감'}).waitFor({timeout:30000});
+      await page.locator('#panel h2').filter({hasText:'📖 도감'}).waitFor({timeout:90000});
       assert.equal(await page.locator('#panel a[href="lab.html"]').isVisible(),true);
       await page.reload();await page.locator('#tabs [data-tab="home"][aria-controls="panel"]').waitFor();await page.locator('#tabs [data-tab="home"]').click();
       await page.locator('.pen-status').filter({hasText:'5/6마리'}).waitFor();

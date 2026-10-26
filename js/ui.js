@@ -320,7 +320,7 @@ async function runBreed() {
   const r = doBreed(B.father, B.mother);
   if (r.error) { toast(r.error); return; }
   sound.play('breed');
-  U.busy = true; U.world.enabled = false; U.open = false;
+  U.busy = true; U.world.enabled = false; U.world.suspended=true;U.open = false;
   const ov = $('#breedOverlay');
   try {
     render(); ov.hidden = false;
@@ -332,7 +332,7 @@ async function runBreed() {
     U.stage?.clear();
     toast('연출을 표시하지 못했지만 새 가족은 우리집에 안전하게 도착했어요');
   } finally {
-    ov.hidden = true; U.busy = false; U.world.enabled = true;
+    ov.hidden = true; U.busy = false; U.world.enabled = true;U.world.suspended=false;
     backgroundInert(false);
   }
   B.father = null; B.mother = null; B.slot = 'father'; U.sel = r.kitten.id;
