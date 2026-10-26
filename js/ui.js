@@ -12,6 +12,8 @@ import { sound } from './audio.js';
 import { loadAudioPreferences, saveAudioPreferences } from './preferences.js';
 import { trapDialogFocus, rememberPanelFocus } from './focus.js';
 import {PLACE_NAMES,tabOfZone} from './locations.js';
+import {destinationName,villageMap} from './village-map.js';
+import {nextStep} from './next-step.js';
 
 const $ = (s) => document.querySelector(s);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
@@ -68,7 +70,7 @@ export function init({development=false}={}) {
   document.querySelector('#top .dev').hidden=!development;
   try { sound.setVolumes(loadAudioPreferences(window.localStorage)); } catch { /* storage access may be unavailable */ }
   U.world = new World($('#world'), { onZone: (id) => handleZone(id), onLocation:()=>updateLocationMenus(),onJourney:id=>{
-    $('#journey').hidden=!id;$('#journeyLabel').textContent=id?`${PLACE_NAMES[tabOfZone(id)]}로 이동 중`:' ';
+    $('#journey').hidden=!id;$('#journeyLabel').textContent=id?`${destinationName(id,G.npcs)} · 이동 중`:' ';
   }, onCat: (id) => {
     if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
     else {const source=sourceOf(id);if(source?.startsWith('npc:')&&!U.world.nearZone(source))navigateTo(source);else showDetail(id, true);}
@@ -84,6 +86,7 @@ export function init({development=false}={}) {
   U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.cancelJourney(); });
   document.addEventListener('visibilitychange', () => { sound.visibility(document.hidden).catch(() => toast('소리를 다시 켜 주세요')); });
   $('#btnSound').onclick = toggleSound;
+  document.addEventListener('toggle',event=>{if(event.target.id==='homeTools')U.toolsOpen=event.target.open;},true);
   document.addEventListener('click', onClick);
   document.addEventListener('input', e => {
     if (e.target.matches('[data-volume]')) {
@@ -150,7 +153,7 @@ function openPanel(tab) {
   if(tab==='npc')U.npc=U.world.zones.find(z=>z.id.startsWith('npc:')&&U.world.nearZone(z.id))?.id.slice(4)??U.npc;
   dexComposing = false; clearTimeout(dexSearchTimer); U.clearStick?.(); U.world.keys = {}; U.world.cancelJourney(); U.tab = tab; U.open = true; render(); $('#panel .xbtn').focus({preventScroll:true});
 }
-function closePanel() { dexComposing = false; clearTimeout(dexSearchTimer); U.open = false; render(); document.querySelector(`#tabs [data-tab="${U.tab}"]`)?.focus({preventScroll:true}); }
+function closePanel() { dexComposing = false; clearTimeout(dexSearchTimer); U.open = false; render(); (document.querySelector(`#tabs [data-tab="${U.tab}"]:not([hidden])`)??$('#tabs [data-tab="home"]')).focus({preventScroll:true}); }
 function updateLocationMenus(){
   if(!U.world)return;
   for(const button of document.querySelectorAll('#tabs [data-tab]'))button.hidden=!U.world.canOpen(button.dataset.tab);
@@ -164,8 +167,8 @@ function navigateTo(id){
   else toast('이곳에서는 길을 찾지 못했어요. 조금 이동한 뒤 다시 시도해 주세요');
 }
 function showMap(){
-  const destinations=[...U.world.zones.filter(z=>!z.id.startsWith('npc:')),U.world.zones.find(z=>z.id==='npc:'+G.npcs[0].id)];
-  openModal(`<h2>🧭 마을 지도</h2><p class="hint">내 고양이는 어디서나 돌볼 수 있어요. 다른 메뉴는 해당 장소에 도착해야 열려요.</p><div class="map-destinations">${destinations.map(z=>`<button class="btn gray" data-act="navigate" data-zone="${z.id}">${PLACE_NAMES[tabOfZone(z.id)]} · ${Math.round(Math.hypot(z.x-U.world.player.position.x,z.z-U.world.player.position.z))}m</button>`).join('')}</div><button class="btn gray" data-act="close">닫기</button>`);
+  const destinations=U.world.zones;
+  openModal(`<h2>🧭 마을 지도</h2><p class="hint">아래 목적지를 고르면 실제로 걸어가요. 파란 점은 집사의 현재 위치입니다.</p>${villageMap(U.world.pens,destinations,U.world.player.position,G.npcs)}<div class="map-destinations">${destinations.map(z=>`<button class="btn gray" data-act="navigate" data-zone="${z.id}">${escapeHtml(destinationName(z.id,G.npcs))}<small>${U.world.nearZone(z.id)?'현재 이곳에 있어요':Math.round(Math.hypot(z.x-U.world.player.position.x,z.z-U.world.player.position.z))+'m · 길찾기'}</small></button>`).join('')}</div><button class="btn gray" data-act="close">닫기</button>`);
 }
 function showPenLevels(){
   openModal(`<h2>🌿 우리 확장 계획</h2><p>현재 Lv.${G.penLevel} · 정원 ${penStatus().capacity}마리</p><p class="hint">재화는 시간 수입·새 도감 보상·동물샵 판매로 모아요. 시작 4마리, 첫 정원 6마리. 처음 확장하면 2마리, 그다음부터 3마리씩 늘어요.</p><table><thead><tr><th>레벨</th><th>정원</th><th>이번 확장 비용</th></tr></thead><tbody>${PARAMS.penLevels.map((level,index)=>`<tr ${index+1===G.penLevel?'aria-current="step"':''}><td>Lv.${index+1}${index+1===G.penLevel?' · 현재':''}</td><td>${level.capacity}마리</td><td>${index?level.cost.toLocaleString()+'🐾':'시작 우리'}</td></tr>`).join('')}</tbody></table><p class="hint">초과한 고양이를 자동으로 팔거나 삭제하지 않아요. 초과분을 판매하거나 확장하기 전에는 추가 교배·교환을 쉬어 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);
@@ -205,6 +208,9 @@ function updateClock() {
   $('#clock').textContent = `🕒 ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 let stageKey = '';
+function currentGoal(cats=myCats().slice().reverse()){
+  return nextStep({pen:penStatus(),coins:G.coins,pending:pendingIncome(),babyId:cats.find(c=>c.personality==null)?.id,readyToBreed:cats.some(f=>f.sex==='M'&&cats.some(m=>m.sex==='F'&&!checkBreed(f,m)))});
+}
 
 /* ───── 우리집 ───── */
 function homeView() {
@@ -214,10 +220,10 @@ function homeView() {
   let html = `<h2>🏠 우리집 <small class="hint">고양이 ${cats.length}마리 · 하루 수입 ${Math.round(cats.reduce((s, x) => s + incomePerHour(x) * 24, 0))}</small></h2>`;
   const litter = litterState(cats, t);
   const pen=penStatus();
+  const goal=currentGoal(cats);U.goalKey=JSON.stringify(goal);
   html+=`<div class="pen-status"><h3>🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리</h3><p>${pen.over?`<strong class="warn-msg">정원 ${pen.over}마리 초과 · 판매 또는 확장 후 추가 교배할 수 있어요.</strong>`:`빈자리 ${pen.capacity-pen.count}마리 · 정원에서 태어난 새끼는 임시 보호해요.`}</p>${pen.next?`<button class="btn sm" data-act="upgradepen" ${G.coins<pen.next.cost?'disabled':''}>우리 확장 · ${pen.next.capacity}마리 (+${pen.next.capacity-pen.capacity}) · ${pen.next.cost}🐾</button>${G.coins<pen.next.cost?`<small> ${pen.next.cost-G.coins}🐾 더 모으면 확장할 수 있어요.</small>`:''}`:'<p>가장 넓은 우리예요.</p>'}${pen.over?'<button class="btn sm gray" data-act="navigate" data-zone="shop">🛍️ 판매하러 동물샵 가기</button>':''}</div>`;
   html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
-  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button><button class="btn sm gray" data-dev="reset">새 게임</button><button class="btn sm gray" data-act="audioSettings">🎵 소리 설정</button></div>`;
-  html += '<div class="row"><button class="btn sm gray" data-act="penlevels">🌿 우리 확장 계획</button><button class="btn sm gray" data-act="mapguide">🧭 장소 안내</button></div><p class="hint">교배는 교배집, 판매는 동물샵, 도감·실험실은 유전 도서관에서 이용해요.</p>';
+  html+=`<div class="next-step"><div><strong>다음 할 일 · ${escapeHtml(goal.title)}</strong><p>${escapeHtml(goal.text)}</p></div><button class="btn sm gray" data-act="${goal.act}" ${goal.zone?`data-zone="${goal.zone}"`:''} ${goal.id?`data-id="${goal.id}"`:''}>${goal.label}</button></div>`;
   if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
   if (c) html += detailBox(c, t);
   html += `<h3>우리 고양이들</h3><div class="grid">` + cats.map((x) => {
@@ -225,6 +231,7 @@ function homeView() {
     return card(x, { sel: x.id === U.sel, attr: `data-act="select" data-id="${x.id}"`, meta: gr > 0 ? `🍼 <span data-until="${x.birthTime + PARAMS.growthWindowMs}">${fmt(gr)}</span>` : `${PERSONALITIES[x.personality].emoji} ${PERSONALITIES[x.personality].name}` });
   }).join('') + '</div>';
   if (!cats.length) html += '<p class="sub">우리집이 비었어요. 도감은 그대로 보관됩니다. 진행을 백업하거나 새 게임을 시작할 수 있어요.</p><button class="btn sm gray" data-dev="reset">새 게임 시작</button>';
+  html+=`<details id="homeTools" class="home-tools" ${U.toolsOpen?'open':''}><summary>우리 확장 계획 · 진행 백업 · 설정</summary><div class="row"><button class="btn sm gray" data-act="penlevels">🌿 우리 확장 계획</button><button class="btn sm gray" data-act="mapguide">🧭 장소 안내</button><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button><button class="btn sm gray" data-act="audioSettings">🎵 소리 설정</button><button class="btn sm gray" data-dev="reset">새 게임</button></div></details>`;
   return html;
 }
 
@@ -313,7 +320,7 @@ async function runBreed() {
   const r = doBreed(B.father, B.mother);
   if (r.error) { toast(r.error); return; }
   sound.play('breed');
-  U.busy = true; U.world.enabled = false; U.open = false;
+  U.busy = true; U.world.enabled = false; U.world.suspended=true;U.open = false;
   const ov = $('#breedOverlay');
   try {
     render(); ov.hidden = false;
@@ -325,7 +332,7 @@ async function runBreed() {
     U.stage?.clear();
     toast('연출을 표시하지 못했지만 새 가족은 우리집에 안전하게 도착했어요');
   } finally {
-    ov.hidden = true; U.busy = false; U.world.enabled = true;
+    ov.hidden = true; U.busy = false; U.world.enabled = true;U.world.suspended=false;
     backgroundInert(false);
   }
   B.father = null; B.mother = null; B.slot = 'father'; U.sel = r.kitten.id;
@@ -501,6 +508,8 @@ function onClick(e) {
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'income':$('#btnIncome').click();break;
+    case 'selectcare':U.sel=d.id;render();$('#panel .care button:not(:disabled)')?.focus();break;
     case 'penlevels':showPenLevels();break;
     case 'mapguide': showMap();break;
     case 'navigate': navigateTo(d.zone);break;
@@ -595,7 +604,7 @@ function everySecond() {
   document.querySelectorAll('[data-cat-activity]').forEach(el => { el.textContent = '🐾 ' + U.world.activityOf(el.dataset.catActivity); });
   const watchedId = $('#watchingCat').dataset.id;
   if (watchedId && cat(watchedId)) $('#watchingLabel').textContent = `${cat(watchedId).name} 관찰 중 · ${U.world.activityOf(watchedId)}`;
-  if (changed || shopRefreshAt !== G.shopRefreshAt) { stageKey = ''; render(); return; }
+  if (changed || shopRefreshAt !== G.shopRefreshAt || (U.open&&U.tab==='home'&&$('#modal').hidden&&JSON.stringify(currentGoal())!==U.goalKey)) { stageKey = ''; render(); return; }
   document.querySelectorAll('[data-until]').forEach((el) => {
     const left = +el.dataset.until - t;
     if (left <= 0) { render(); return; }

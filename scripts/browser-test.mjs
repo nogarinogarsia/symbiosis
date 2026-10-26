@@ -30,6 +30,7 @@ try{
     page.on('pageerror',error=>errors.push(error.message));
     page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
     await page.route('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',route=>route.fulfill({status:200,contentType:'text/javascript',body:three}));
+    await page.route('https://fonts.googleapis.com/**',route=>route.fulfill({status:200,contentType:'text/css',body:''}));
     try{
       await page.goto(`http://127.0.0.1:${server.address().port}/smoke.html`);
       await page.locator('#smokeReport[data-complete="true"]').waitFor({timeout:120000});
@@ -37,7 +38,7 @@ try{
       await writeFile(resolve(output,`${name}.txt`),report+'\n\nConsole errors:\n'+errors.join('\n'));
       assert.equal(await page.locator('#smokeChecks .bad').count(),0,report);
       assert.deepEqual(errors,[],`${name}: browser errors`);
-      assert.ok(await page.locator('#smokeChecks .ok').count()>=31,'Not all UI checks ran');
+      assert.ok(await page.locator('#smokeChecks .ok').count()>=33,'Not all UI checks ran');
       console.log(`${name}: ${await page.locator('#smokeSummary').innerText()}`);
       await page.screenshot({path:resolve(output,`${name}-game.png`),fullPage:true});
       await page.goto(`http://127.0.0.1:${server.address().port}/lab.html`);
@@ -59,6 +60,40 @@ try{
       assert.equal(await page.locator('#run').isEnabled(),true,'Cancellation did not restore controls');
       assert.deepEqual(errors,[],`${name}: lab browser errors`);
       console.log(`${name}: lab theory, allele editing focus, seeded results and cancellation passed`);
+      await page.screenshot({path:resolve(output,`${name}-lab.png`),fullPage:true});
+      // Exercise the normal entry point with actual pointer actions and frame-driven walking.
+      await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
+      await page.locator('#coins').filter({hasText:'200'}).waitFor();
+      assert.equal(await page.locator('#top .dev').isVisible(),false,'Public entry exposed time skips');
+      for(const tab of ['breed','shop','npc','dex'])assert.equal(await page.locator(`#tabs [data-tab="${tab}"]`).isVisible(),false);
+      await page.locator('#tabs [data-tab="home"]').click();
+      assert.match(await page.locator('.pen-status').innerText(),/4\/6마리/);
+      assert.equal(await page.locator('#homeTools').getAttribute('open'),null);
+      await page.locator('.next-step [data-act="navigate"][data-zone="breed"]').click();
+      await page.locator('#panel h2').filter({hasText:'💞 교배'}).waitFor({timeout:45000});
+      await page.locator('#panel [data-act="pick"]:not(:disabled)').first().click();
+      await page.locator('#panel [data-act="pick"]:not(:disabled)').first().click();
+      await page.locator('#panel [data-act="dobreed"]').click();
+      await page.locator('#modal h2').filter({hasText:'새 가족'}).waitFor({timeout:20000});
+      await page.locator('#modal [data-act="close"]').click();
+      assert.match(await page.locator('.pen-status').innerText(),/5\/6마리/);
+      await page.locator('#panel [data-act="care"][data-a="yarn"]').click();
+      assert.equal(await page.locator('#panel [data-act="care"][data-a="yarn"]').isDisabled(),true);
+      await page.locator('#tabs [data-act="mapguide"]').click();
+      assert.equal(await page.locator('#modal .village-map').count(),1);
+      assert.equal(await page.locator('#modal [data-act="navigate"]').count(),8);
+      await page.locator('#modal [data-zone="npc:n5"]').click();
+      await page.locator('#panel h2').filter({hasText:'이웃'}).waitFor({timeout:90000});
+      assert.match(await page.locator('#panel').innerText(),/미루/);
+      await page.locator('#tabs [data-act="mapguide"]').click();
+      await page.locator('#modal [data-zone="dex"]').click();
+      await page.locator('#panel h2').filter({hasText:'📖 도감'}).waitFor({timeout:90000});
+      assert.equal(await page.locator('#panel a[href="lab.html"]').isVisible(),true);
+      await page.reload();await page.locator('#tabs [data-tab="home"][aria-controls="panel"]').waitFor();await page.locator('#tabs [data-tab="home"]').click();
+      await page.locator('.pen-status').filter({hasText:'5/6마리'}).waitFor();
+      assert.equal(await page.locator('#top .dev').isVisible(),false);
+      assert.deepEqual(errors,[],`${name}: normal play browser errors`);
+      console.log(`${name}: normal play, real navigation, birth/care, all-neighbor map, library and reload passed`);
     }finally{
       await page.screenshot({path:resolve(output,`${name}.png`),fullPage:true});
       await context.close();

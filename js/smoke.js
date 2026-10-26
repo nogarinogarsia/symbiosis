@@ -5,7 +5,7 @@ const summary = document.querySelector('#smokeSummary');
 const results = [];
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const $ = selector => document.querySelector(selector);
-const click = selector => { const element = $(selector); assert(element && !element.disabled, `조작할 수 없음: ${selector}`); element.click(); };
+const click = selector => { const element = $(selector); assert(element && !element.disabled, `조작할 수 없음: ${selector}`); element.closest('details:not([open])')?.querySelector('summary').click();element.click(); };
 const waitUntil = (predicate, timeout = 12000) => new Promise((resolve, reject) => {
   const start = performance.now();
   const check = () => {
@@ -65,6 +65,19 @@ try {
     assert(U.open&&U.tab==='npc'&&U.world.canOpen('npc'),'울타리를 우회해 이웃 도착');
     U.world.teleport(-1,13);U.world.checkZones();assert(!U.open&&$('#tabs [data-tab="npc"]').hidden,'장소 이탈 시 메뉴 닫기');
     visit('home');
+  });
+  await check('현재 위치 지도·이웃 다섯 목적지·다음 할 일·접는 설정',()=>{
+    assert($('#panel .next-step').textContent.includes('새 가족'),'초기 목표 안내');
+    assert(!$('#homeTools').open,'돌봄 우선으로 설정 접기');
+    click('#panel [data-act="penlevels"]');assert($('#homeTools').open,'설정 펼쳐 계획 열기');
+    click('#modal [data-act="close"]');
+    click('#tabs [data-act="mapguide"]');
+    assert($('#modal .village-map').getAttribute('role')==='img','지도 설명');
+    assert($('#modal').querySelectorAll('[data-act="navigate"]').length===8,'건물 셋과 이웃 다섯');
+    assert($('#modal').textContent.includes('밤토리')&&$('#modal').textContent.includes('미루'),'이웃별 이름');
+    click('#modal [data-zone="npc:n5"]');
+    assert(U.world.destination==='npc:n5'&&$('#journeyLabel').textContent.includes('미루'),'선택한 이웃과 이동 안내 일치');
+    click('#journey [data-act="canceljourney"]');visit('home');
   });
   await check('쉼터 1마리 예약·도착·만석 대체 행동', () => {
     const world=U.world, all=[...world.catObjs.values()], mine=all.filter(o=>o.pen==='mine');
@@ -188,6 +201,12 @@ try {
     const frame = U.stage.renderer.info.render.frame;
     U.stage.frame();
     assert(U.stage.renderer.info.render.frame === frame, '숨겨진 무대 렌더');
+  });
+  await check('연출 뒤에 가려진 월드 렌더 중지·복귀',()=>{
+    const world=U.world,frame=world.renderer.info.render.frame;
+    try{world.suspended=true;world.frame();assert(world.renderer.info.render.frame===frame,'가려진 월드 렌더 중지');}
+    finally{world.suspended=false;}
+    world.frame();assert(world.renderer.info.render.frame>frame,'월드 렌더 복귀');
   });
   await check('한글 조합 보호·실시간 검색 초점 유지→검색 해제', async () => {
     visit('dex');
@@ -364,6 +383,8 @@ try {
     assert(game.checkBreed(parents.find(c=>c.sex==='M'),parents.find(c=>c.sex==='F')).includes('정원'),'초과 교배 차단');
     assert(JSON.stringify(game.G)===before,'차단 시 진행 보존');
     visit('home');assert($('#panel').textContent.includes('정원 1마리 초과'),'초과 안내');click('#btnIncome');
+    // Low-income random founders may need more than one capped day to afford level three.
+    for(let day=0;day<8&&game.G.coins<game.penStatus().next.cost;day++){click('[data-dev="1d"]');click('#btnIncome');}
     click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
     assert(game.penStatus().capacity===11&&game.penStatus().over===0&&game.G.mine.length===9,'확장해 모든 고양이 보존');
   });
