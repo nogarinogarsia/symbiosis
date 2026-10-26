@@ -1,6 +1,7 @@
 // Validate a complete snapshot before it can replace the live game.
 import { AUTOSOMAL, POLY } from './genes.js';
 import { SPECIALS, FANTASY, COSTUMES } from './engine.js';
+import { PARAMS } from './params.js';
 
 export function validateSave(data) {
   const fail = () => { throw new Error('올바른 냥냥 유전 하우스 저장 파일이 아니에요'); };
@@ -8,6 +9,7 @@ export function validateSave(data) {
   if (data.version != null && data.version !== 1) fail();
   if (!Number.isFinite(data.coins) || data.coins < 0 || !Number.isFinite(data.offset) || !Number.isFinite(data.lastCollect)) fail();
   if (data.incomeRemainder != null && (!Number.isFinite(data.incomeRemainder) || data.incomeRemainder < 0 || data.incomeRemainder >= 1)) fail();
+  if(data.penLevel!=null&&(!Number.isInteger(data.penLevel)||data.penLevel<1||data.penLevel>PARAMS.penLevels.length))fail();
   if (!data.cats || typeof data.cats !== 'object' || Array.isArray(data.cats)) fail();
   if (!Array.isArray(data.mine) || !Array.isArray(data.shop) || !Array.isArray(data.npcs) || !data.dex || typeof data.dex !== 'object' || Array.isArray(data.dex)) fail();
   const has = id => typeof id === 'string' && Object.hasOwn(data.cats, id);

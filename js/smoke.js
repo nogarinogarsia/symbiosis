@@ -36,15 +36,35 @@ try {
   const game = await import('./game.js');
   const { init, U } = await import('./ui.js');
   const { litterState } = await import('./wellbeing.js');
-  game.newGame(); init();
+  game.newGame(); init({development:true});
+  // Existing UI regressions now visit the required place before exercising its menu.
+  const visit=tab=>{
+    if(tab!=='home'){
+      const zone=U.world.zones.find(z=>tab==='npc'?z.id==='npc:n1':z.id===tab);
+      U.world.teleport(zone.x,zone.z);U.world.checkZones();
+    }
+    if(!U.open||U.tab!==tab)click(`#tabs [data-tab="${tab}"]`);
+  };
   await check('실제 월드 생성·시작 고양이·샵·이웃 동기화', () => {
     assert(game.G.mine.length === 4 && game.G.shop.length === 8 && game.G.npcs.length === 5, '초기 개체 수');
     assert(U.world.catObjs.size === 19 && U.world.renderer.info.render.calls >= 0, '월드 개체 동기화');
     assert($('#panel').hidden, '초기 패널 닫힘');
   });
   await check('메뉴 클릭으로 우리집 패널 표시', () => {
-    click('#tabs [data-tab="home"]');
+    visit('home');
     assert(!$('#panel').hidden && $('#panel').textContent.includes('고양이 4마리'), '우리집 렌더');
+  });
+  await check('원격 메뉴 차단·지도 길찾기·도착 후 메뉴·이탈 시 닫기',()=>{
+    click('#panel [data-act="closepanel"]');
+    for(const tab of ['breed','shop','dex','npc'])assert($(`#tabs [data-tab="${tab}"]`).hidden,'장소 밖 메뉴 숨김');
+    $('#tabs [data-tab="breed"]').click();assert(!U.open&&U.world.destination==='breed','숨긴 메뉴 직접 호출도 원격 실행 방지');
+    U.world.cancelJourney();click('#tabs [data-act="mapguide"]');
+    click('#modal [data-act="navigate"][data-zone="npc:n1"]');
+    assert(!U.open&&U.world.destination==='npc:n1'&&U.world.target,'지도는 즉시 기능 대신 이동');
+    for(let i=0;i<2000&&!U.open;i++){U.world.movePlayer(.05,i*.05);U.world.checkZones();}
+    assert(U.open&&U.tab==='npc'&&U.world.canOpen('npc'),'울타리를 우회해 이웃 도착');
+    U.world.teleport(-1,13);U.world.checkZones();assert(!U.open&&$('#tabs [data-tab="npc"]').hidden,'장소 이탈 시 메뉴 닫기');
+    visit('home');
   });
   await check('쉼터 1마리 예약·도착·만석 대체 행동', () => {
     const world=U.world, all=[...world.catObjs.values()], mine=all.filter(o=>o.pen==='mine');
@@ -118,6 +138,7 @@ try {
     assert(document.activeElement===opener,'대화창을 연 버튼으로 초점 복귀');
   });
   await check('판매·새 게임 확인 취소에 진행 보존', () => {
+    visit('shop');
     const ids=[...game.G.mine],coins=game.G.coins;
     click('#panel [data-act="sell"]');
     assert($('#modal h2').textContent==='고양이 판매','판매 확인 표시');
@@ -132,6 +153,7 @@ try {
     assert(document.activeElement===cancel,'Tab은 첫 취소 버튼으로 순환');
     click('#modal [data-act="close"]');
     assert(JSON.stringify(game.G.mine)===JSON.stringify(ids) && game.G.coins===coins,'새 게임 취소');
+    visit('home');
   });
   await check('성묘 돌봄 클릭·저장 반영', () => {
     const id = U.sel;
@@ -141,7 +163,7 @@ try {
     assert(stored.cats[id].wellbeing.food === game.cat(id).wellbeing.food, '돌봄 저장');
   });
   await check('교배 후보 선택·부모 슬롯·실행 가능 상태', () => {
-    click('#tabs [data-tab="breed"]');
+    visit('breed');
     assert([...$('#panel').querySelectorAll('.slot')].every(slot=>slot.tagName==='BUTTON'),'부모 슬롯 키보드 조작');
     click('#panel [data-act="pick"]:not(.dis)');
     click('#panel [data-act="pick"]:not(.dis)');
@@ -168,7 +190,7 @@ try {
     assert(U.stage.renderer.info.render.frame === frame, '숨겨진 무대 렌더');
   });
   await check('한글 조합 보호·실시간 검색 초점 유지→검색 해제', async () => {
-    click('#tabs [data-tab="dex"]');
+    visit('dex');
     const input = $('#dexSearch'); input.focus();input.value = 'no-result-smoke-xyz';
     input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));
     input.dispatchEvent(new InputEvent('input', {bubbles:true,isComposing:true}));
@@ -183,19 +205,19 @@ try {
     assert($('#panel').querySelectorAll('.card').length >= 4, '검색 해제');
   });
   await check('관찰 버튼→추적 카메라→기본 시점 복귀', () => {
-    click('#tabs [data-tab="home"]'); click('#panel [data-act="focuscat"]');
+    visit('home'); click('#panel [data-act="focuscat"]');
     assert(U.world.followCatId === U.sel && !$('#watchingCat').hidden, '고양이 관찰');
     click('#returnCamera'); assert(!U.world.followCatId && $('#watchingCat').hidden, '관찰 종료');
   });
   await check('이웃 카드 상세·교환 버튼 분리와 교환 취소', () => {
-    click('#tabs [data-tab="npc"]');
-    assert($('#panel').querySelectorAll('article.card .card-main').length===15,'이웃 상세 버튼');
+    visit('npc');
+    assert($('#panel').querySelectorAll('article.card .card-main').length===3,'도착한 이웃의 상세 버튼');
     assert($('#panel').querySelectorAll('button button').length===0,'버튼 중첩 방지');
     const mine=[...game.G.mine];click('#panel [data-act="trade"]');
     assert($('#modal').querySelectorAll('button[data-act="dotrade"]').length===mine.length,'키보드로 고를 수 있는 교환 후보');
     click('#modal [data-act="close"]');
     assert(JSON.stringify(game.G.mine)===JSON.stringify(mine),'교환 취소 진행 유지');
-    click('#tabs [data-tab="npc"]');
+    visit('npc');
   });
   await check('시간 이동→성장 확정·월드 청소 오브젝트 생성', () => {
     click('[data-dev="1d"]');
@@ -280,8 +302,19 @@ try {
       assert(second.userData.textureSet.body.image.toDataURL()===pixels, '토티 패치 재생성 일관성');
     } finally {if(first)disposeCat(first);if(second)disposeCat(second);}
   });
+  await check('재화로 우리 확장·취소 보존·확인 차감·저장',()=>{
+    visit('home');click('#btnIncome');
+    const before=game.G.coins,level=game.G.penLevel,cost=game.penStatus().next.cost,oldPen=U.world.pens.mine,walls=U.world.colliders.length;
+    assert(before>=cost,'첫 확장 재화');
+    click('#panel [data-act="upgradepen"]');click('#modal [data-act="close"]');
+    assert(game.G.coins===before&&game.G.penLevel===level,'확장 취소');
+    click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
+    assert(game.G.coins===before-cost&&game.G.penLevel===level+1&&game.penStatus().capacity===8,'확장 확인');
+    assert(U.world.pens.mine.w>oldPen.w&&oldPen.group.userData.disposed&&U.world.colliders.length===walls,'실제 울타리 확장·이전 자원/충돌체 정리');
+    assert(JSON.parse(memory.getItem('catgene-save-v1')).penLevel===2,'우리 레벨 저장');
+  });
   await check('교배 연출 건너뛰기·중복 클릭 방지·새끼 저장', async () => {
-    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('[data-dev="1d"]');visit('breed');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
     const before=game.G.mine.length,button=$('#panel [data-act="dobreed"]');button.click();button.click();
     assert(U.busy && document.activeElement.id==='skipBreed','건너뛰기 초점');
@@ -291,7 +324,7 @@ try {
     click('#modal [data-act="close"]');
   });
   await check('교배 연출 Tab 초점 격리·Escape 건너뛰기', async () => {
-    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('[data-dev="1d"]');visit('breed');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
     const before=game.G.mine.length;click('#panel [data-act="dobreed"]');
     const skip=$('#skipBreed');skip.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
@@ -302,7 +335,7 @@ try {
     click('#modal [data-act="close"]');
   });
   await check('교배 무대 초기화 오류에도 새끼 보존·초점 격리 해제', async () => {
-    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('[data-dev="1d"]');visit('breed');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
     const before=game.G.mine.length,resize=U.stage.resize;
     try{
@@ -314,7 +347,7 @@ try {
     }finally{U.stage.resize=resize;}
   });
   await check('교배 프레임 오류에도 새끼 보존·조작 복구', async () => {
-    click('[data-dev="1d"]');click('#tabs [data-tab="breed"]');
+    click('[data-dev="1d"]');visit('breed');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
     const before=game.G.mine.length;click('#panel [data-act="dobreed"]');
     U.stage.anim=()=>{throw new Error('isolated animation failure');};U.stage.frame();
@@ -325,10 +358,19 @@ try {
     click('#modal [data-act="close"]');
     assert(!$('#top').inert && U.world.enabled,'배경 조작 복귀');
   });
+  await check('정원 초과 새끼 보존·추가 교배 차단·확장으로 해소',()=>{
+    assert(game.penStatus().over===1&&game.G.mine.length===9,'9마리 중 정원 8 초과 보호');
+    const before=JSON.stringify(game.G);const parents=game.myCats().filter(c=>c.personality!==null);
+    assert(game.checkBreed(parents.find(c=>c.sex==='M'),parents.find(c=>c.sex==='F')).includes('정원'),'초과 교배 차단');
+    assert(JSON.stringify(game.G)===before,'차단 시 진행 보존');
+    visit('home');assert($('#panel').textContent.includes('정원 1마리 초과'),'초과 안내');click('#btnIncome');
+    click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
+    assert(game.penStatus().capacity===11&&game.penStatus().over===0&&game.G.mine.length===9,'확장해 모든 고양이 보존');
+  });
   await check('명시적 판매·새 게임 확인 시에만 상태 변경', () => {
-    click('#tabs [data-tab="home"]');
-    const soldId=U.sel,before=game.G.mine.length;
-    click('#panel [data-act="sell"]');click('#modal [data-act="confirm"]');
+    visit('home');
+    const soldId=U.sel,before=game.G.mine.length;visit('shop');
+    click(`#panel [data-act="sell"][data-id="${soldId}"]`);click('#modal [data-act="confirm"]');
     assert(game.G.mine.length===before-1 && !game.G.mine.includes(soldId),'판매 확인 실행');
     click('[data-dev="reset"]');click('#modal [data-act="confirm"]');
     assert(game.G.mine.length===4 && game.G.offset===0 && !U.breed.father && !U.breed.mother,'새 게임 확인 실행');
@@ -346,3 +388,4 @@ summary.textContent = `${fails ? `${fails}개 실패` : '전체 통과'} · ${re
 summary.className = fails ? 'bad' : 'ok';
 window.__uiSmokeResults = {total:results.length,fails,results};
 report.dataset.complete = 'true';
+const explore=document.createElement('button');explore.textContent='검사창 접고 직접 둘러보기';explore.id='exploreSmoke';explore.onclick=()=>{report.hidden=true;};report.appendChild(explore);
