@@ -8,7 +8,7 @@ import { dailyCare } from './wellbeing.js';
 
 const KEY = 'catgene-save-v1';
 export const G = {
-  coins: 0, incomeRemainder: 0, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: 0, shopRefreshAt: 0, offset: 0, seq: 0, log: [],
+  coins: 0, incomeRemainder: 0, penLevel: 1, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: 0, shopRefreshAt: 0, offset: 0, seq: 0, log: [],
 };
 export let saveError = '';
 export let loadIssue = null;
@@ -29,7 +29,7 @@ function makeFounder(prefix, opts = {}) {
 
 export function newGame() {
   G.offset = 0;
-  Object.assign(G, { coins: PARAMS.startCoins, incomeRemainder: 0, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: now(), shopRefreshAt: now() + PARAMS.shopRefreshMs, seq: 0, log: [] });
+  Object.assign(G, { coins: PARAMS.startCoins, incomeRemainder: 0, penLevel: 1, cats: {}, mine: [], shop: [], npcs: [], dex: {}, lastCollect: now(), shopRefreshAt: now() + PARAMS.shopRefreshMs, seq: 0, log: [] });
   // 시작 고양이 4마리 (수컷2·암컷2, 12좌위 개체군에서 새로 생성)
   for (const sex of ['M', 'F', 'M', 'F']) { const c = makeFounder('start', { sex, specialChance: 0 }); G.mine.push(c.id); registerDex(c, true); }
   refillShop();
@@ -61,7 +61,7 @@ export function importSave(raw) {
   const data = validateSave(JSON.parse(raw));
   const cats = Object.fromEntries(Object.entries(data.cats).map(([id, c]) => [id, refreshCat({ ...c, lastBreedAt: c.lastBreedAt ?? -1e15 })]));
   // Commit only after parsing, validation, and phenotype rebuilding all succeed.
-  Object.assign(G, { coins: data.coins, incomeRemainder: data.incomeRemainder ?? 0, cats, mine: data.mine, shop: data.shop, npcs: data.npcs,
+  Object.assign(G, { coins: data.coins, incomeRemainder: data.incomeRemainder ?? 0, penLevel: data.penLevel ?? 1, cats, mine: data.mine, shop: data.shop, npcs: data.npcs,
     dex: data.dex, lastCollect: data.lastCollect, shopRefreshAt: Number.isFinite(data.shopRefreshAt) ? data.shopRefreshAt : Date.now() + data.offset + PARAMS.shopRefreshMs, offset: data.offset, seq: data.seq ?? 0, log: Array.isArray(data.log) ? data.log : [] });
   loadIssue = null;
   return save();
@@ -84,6 +84,19 @@ export function reset() { loadIssue = null; try { localStorage.removeItem(KEY); 
 export const cat = (id) => G.cats[id];
 export const myCats = () => G.mine.map(cat).filter(Boolean);
 export const shopCats = () => G.shop.map(cat).filter(Boolean);
+
+export function penStatus() {
+  const current=PARAMS.penLevels[G.penLevel-1],next=PARAMS.penLevels[G.penLevel]??null;
+  return {level:G.penLevel,capacity:current.capacity,count:G.mine.length,over:Math.max(0,G.mine.length-current.capacity),next};
+}
+export function upgradePen(expectedLevel=G.penLevel) {
+  const status=penStatus();
+  if(expectedLevel!==G.penLevel)return {ok:false,msg:'우리 레벨이 바뀌었어요. 다시 확인해 주세요'};
+  if(!status.next)return {ok:false,msg:'이미 가장 넓은 우리예요'};
+  if(G.coins<status.next.cost)return {ok:false,msg:`재화가 부족해요 (필요 ${status.next.cost}, 부족 ${status.next.cost-G.coins})`};
+  G.coins-=status.next.cost;G.penLevel++;save();
+  return {ok:true,...penStatus(),cost:status.next.cost};
+}
 
 /* 도감 */
 export function dexTotals() {
@@ -159,6 +172,7 @@ export function sell(id) {
 
 /* NPC 교환: 모든 교환 수락, 횟수 제한 없음 (프로토타입) */
 export function trade(myId, npcId, npcCatId) {
+  if(penStatus().over)return false;
   const npc = G.npcs.find((n) => n.id === npcId);
   if (!npc || !G.mine.includes(myId) || !npc.cats.includes(npcCatId)) return false;
   collectIncome();
@@ -185,6 +199,7 @@ export function breedCost(a, b) {
 }
 
 export function checkBreed(father, mother) {
+  if(penStatus().over)return `우리 정원보다 ${penStatus().over}마리 많아요. 동물샵에서 판매하거나 우리를 확장해 주세요`;
   if (!father || !mother || !sourceOf(father.id) || !sourceOf(mother.id)) return '현재 교배할 수 있는 고양이를 골라 주세요';
   const msg = canBreed(father, mother, now());
   if (msg) return msg;

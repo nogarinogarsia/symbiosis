@@ -5,6 +5,8 @@ import { buildCat, disposeCat } from './cat3d.js';
 import { toon } from './cat3d.js';
 import { addLights } from './stage.js';
 import { RNG } from './rng.js';
+import {nearbyZones,canOpenAt} from './locations.js';
+import {findPath,segmentClear} from './navigation.js';
 
 const CAT_SCALE = 0.7;
 const BOUNDS = { minX: -36, maxX: 36, minZ: -26, maxZ: 22 };
@@ -120,6 +122,7 @@ export class World {
     return g;
   }
   buildBuildings() {
+    this.house(-23, 4, 5.8, 4, 0xf1ead5, 0x8daf9c, '📖 유전 도서관', 'dex');
     this.house(20, 3, 6.5, 4.6, 0xfbeed1, 0xe58a6a, '🛍️ 동물샵', 'shop');
     this.house(6, 8, 5.4, 4, 0xffe0e6, 0xf08a9b, '💞 교배집', 'breed');
   }
@@ -127,13 +130,15 @@ export class World {
   /* ───── 우리(울타리) ───── */
   buildPen(id, cx, cz, w, d, name, color = 0xf2e2b6) {
     const g = new THREE.Group(); this.scene.add(g);
+    const obstacles=[];
     const yard = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color }));
     yard.rotation.x = -Math.PI / 2; yard.position.set(cx, 0.03, cz); g.add(yard);
     const wood = toon(0xc99a66), gate = 1.8;
     const postGeo = new THREE.BoxGeometry(0.22, 1.1, 0.22);
     const rail = (x, z, lw, ld) => {
       for (const y of [0.45, 0.85]) { const m = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.12, ld), wood); m.position.set(x, y, z); g.add(m); }
-      this.colliders.push([x - lw / 2 - 0.05, x + lw / 2 + 0.05, z - ld / 2 - 0.05, z + ld / 2 + 0.05]);
+      const obstacle=[x - lw / 2 - 0.05, x + lw / 2 + 0.05, z - ld / 2 - 0.05, z + ld / 2 + 0.05];
+      this.colliders.push(obstacle);obstacles.push(obstacle);
     };
     const post = (x, z) => { const m = new THREE.Mesh(postGeo, wood); m.position.set(x, 0.55, z); g.add(m); };
     const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - d / 2, z1 = cz + d / 2;
@@ -144,7 +149,8 @@ export class World {
     for (let x = x0; x <= x1 + 0.01; x += 1.5) { if (Math.abs(x - cx) > gate / 2 - 0.05) { post(x, z0); post(x, z1); } }
     for (let z = z0; z <= z1 + 0.01; z += 1.5) { post(x0, z); post(x1, z); }
     const lb = label(name, { scale: 0.95 }); lb.position.set(cx, 3.1, z0 + 0.3); g.add(lb);
-    this.pens[id] = { id, cx, cz, w, d, minX: x0 + 1, maxX: x1 - 1, minZ: z0 + 1, maxZ: z1 - 1, gate: { x: cx, z: z1 } };
+    g.userData.ownedTextures=new Set([lb.material.map]);
+    this.pens[id] = { id, cx, cz, w, d, group:g,obstacles,minX: x0 + 1, maxX: x1 - 1, minZ: z0 + 1, maxZ: z1 - 1, gate: { x: cx, z: z1 } };
     this.buildShelters(this.pens[id]);
   }
   buildShelters(pen) {
@@ -158,6 +164,7 @@ export class World {
       const roof = new THREE.Mesh(new THREE.ConeGeometry(1.55,.65,4),toon(0xa9cbb9));
       roof.rotation.y = Math.PI/4; roof.scale.z = .85; roof.position.y = 1.92; hut.add(roof);
       const sign = label('🌿 조용한 쉼터',{scale:.48});sign.position.set(0,2.65,0);hut.add(sign);
+      hut.userData.ownedTextures=new Set([sign.material.map]);
       this.scene.add(hut);
       return {id:`${pen.id}:shelter:${index}`,x,z,object:hut};
     });
@@ -166,6 +173,34 @@ export class World {
     this.buildPen('mine', -9, 2, 12, 9, '🏠 우리 집', 0xf5e6b8);
     this.buildLitterTray();
     this.npcPositions = [-24, -12, 0, 12, 24];
+    this.penLevel=1;
+  }
+  syncPen(level,capacity,count){
+    if(this.penLevel!==level){
+      const previous=this.pens.mine,journey=this.destination;
+      this.cancelJourney();this.colliders=this.colliders.filter(o=>!previous.obstacles.includes(o));
+      this.scene.remove(previous.group);disposeCat(previous.group);
+      for(const shelter of previous.shelters){this.scene.remove(shelter.object);disposeCat(shelter.object);}
+      this.scene.remove(this.litterTray);this.litterLabel?.material.map.dispose();disposeCat(this.litterTray);
+      this.litterLabel=null;this.litterKey=null;this.penSign=null;this.penSignKey=null;
+      this.buildPen('mine',-9,2,12+(level-1)*.8,9+(level-1)*.3,`🏠 우리 집 Lv.${level}`,level>=5?0xe0e8b9:0xf5e6b8);
+      this.buildLitterTray();this.penLevel=level;
+      for(const o of this.catObjs.values())if(o.pen==='mine'){o.shelterId=null;o.partnerId=null;o.moving=false;o.activity='idle';o.wait=2;}
+      if(!segmentClear(this.player.position,this.player.position,this.colliders)){
+        const start=this.player.position.clone();let moved=false;
+        for(let r=.5;r<=3&&!moved;r+=.5)for(let i=0;i<16&&!moved;i++){
+          const point={x:start.x+Math.cos(i*Math.PI/8)*r,z:start.z+Math.sin(i*Math.PI/8)*r};
+          if(segmentClear(point,point,this.colliders)){this.player.position.set(point.x,0,point.z);moved=true;}
+        }
+      }
+      if(journey)this.goToZone(journey);
+    }
+    const key=`${level}:${capacity}:${count}`;
+    if(this.penSignKey===key)return;
+    const pen=this.pens.mine;
+    if(this.penSign){pen.group.remove(this.penSign);pen.group.userData.ownedTextures.delete(this.penSign.material.map);this.penSign.material.map.dispose();this.penSign.material.dispose();}
+    this.penSign=label(`Lv.${level} · ${count}/${capacity}마리`,{scale:.8,bg:count>capacity?'#ffe1d3':'#fffaf0'});
+    this.penSign.position.set(pen.cx-3,2,pen.gate.z+.1);pen.group.add(this.penSign);pen.group.userData.ownedTextures.add(this.penSign.material.map);this.penSignKey=key;
   }
   buildLitterTray() {
     const pen = this.pens.mine;
@@ -251,7 +286,7 @@ export class World {
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         if (!v) { delete this.keys[key]; return; }
         if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-        this.keys[key] = v; if (v) this.target = null; e.preventDefault();
+        this.keys[key] = v; if (v) this.cancelJourney(); e.preventDefault();
       }
     };
     addEventListener('keydown', (e) => k(e, true)); addEventListener('keyup', (e) => k(e, false));
@@ -288,7 +323,7 @@ export class World {
       }
     }
     const gh = this.ray.intersectObject(this.ground)[0];
-    if (gh) { this.stopWatching(); this.target = new THREE.Vector3(gh.point.x, 0, gh.point.z); }
+    if (gh) { this.stopWatching(); this.cancelJourney();this.setRoute({x:gh.point.x,z:gh.point.z}); }
   }
   resize() {
     const w = innerWidth, h = innerHeight;
@@ -301,7 +336,20 @@ export class World {
     this.camera.position.set(this.camPos.x + Math.sin(orbit) * distance * .97, distance, this.camPos.z + Math.cos(orbit) * distance * .97);
     this.camera.lookAt(this.camPos.x, 1, this.camPos.z - 0.5);
   }
-  teleport(x, z) { this.player.position.set(x, 0, z); this.target = null; this.snapCamera(); }
+  teleport(x, z) { this.player.position.set(x, 0, z); this.cancelJourney(); this.snapCamera(); }
+  canOpen(tab) {return canOpenAt(tab,this.player.position,this.zones);}
+  nearZone(id) {return nearbyZones(this.player.position,this.zones).some(zone=>zone.id===id);}
+  goToZone(id) {
+    const zone=this.zones.find(z=>z.id===id);
+    if(!zone)return false;
+    this.stopWatching();this.keys={};if(!this.setRoute(zone))return false;this.destination=id;
+    this.hooks.onJourney?.(id);return true;
+  }
+  setRoute(end){
+    const route=findPath(this.player.position,{x:end.x,z:end.z},this.colliders,BOUNDS);
+    this.waypoints=route;const first=route.shift();this.target=first?new THREE.Vector3(first.x,0,first.z):null;return !!first;
+  }
+  cancelJourney() {this.target=null;this.waypoints=[];this.destination=null;this.hooks.onJourney?.(null);}
 
   /* ───── 고양이 동기화 ───── */
   sync(desired) { // desired: [{cat, pen}]
@@ -358,21 +406,22 @@ export class World {
   }
   movePlayer(dt, t) {
     const p = this.player;
-    let dx = 0, dz = 0;
+    let dx = 0, dz = 0, followsRoute=false;
     if (this.enabled) {
       dx = this.stick.x; dz = this.stick.y;
       if (this.keys.w || this.keys.arrowup) dz -= 1; if (this.keys.s || this.keys.arrowdown) dz += 1;
       if (this.keys.a || this.keys.arrowleft) dx -= 1; if (this.keys.d || this.keys.arrowright) dx += 1;
       if (!dx && !dz && this.target) {
+        followsRoute=true;
         const ex = this.target.x - p.position.x, ez = this.target.z - p.position.z, dist = Math.hypot(ex, ez);
-        if (dist < 0.2) this.target = null; else { dx = ex / dist; dz = ez / dist; }
+        if (dist < 0.1) {const next=this.waypoints?.shift();this.target=next?new THREE.Vector3(next.x,0,next.z):null;} else { dx = ex / dist; dz = ez / dist; }
       }
     }
     const moving = dx || dz;
     if (moving) {
       this.stopWatching();
       const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
-      const sp = 6.2 * dt;
+      const sp = followsRoute&&this.target?Math.min(6.2*dt,Math.hypot(this.target.x-p.position.x,this.target.z-p.position.z)):6.2*dt;
       this.tryMove(p.position, dx * sp, 0); this.tryMove(p.position, 0, dz * sp);
       const ang = Math.atan2(dx, dz);
       let da = ang - p.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); p.rotation.y += da * Math.min(1, dt * 12);
@@ -443,9 +492,12 @@ export class World {
   }
   checkZones() {
     const p = this.player.position;
+    const nearby=nearbyZones(p,this.zones),key=nearby.map(z=>z.id).join('|');
+    if(this.locationKey!==key){this.locationKey=key;this.hooks.onLocation?.(nearby);}
+    if(this.destination&&nearby.some(z=>z.id===this.destination)){const id=this.destination;this.cancelJourney();if(this.enabled)this.hooks.onZone?.(id,false);}
     for (const z of this.zones) {
       const d = Math.hypot(p.x - z.x, p.z - z.z), inside = d < z.r;
-      if (inside && !this.inside[z.id]) { this.inside[z.id] = true; if (this.enabled) this.hooks.onZone?.(z.id, false); }
+      if (inside && !this.inside[z.id]) { this.inside[z.id] = true; if (this.enabled&&(!this.destination||this.destination===z.id)) this.hooks.onZone?.(z.id, false); }
       else if (!inside && d > z.r + 0.8) this.inside[z.id] = false;
     }
   }

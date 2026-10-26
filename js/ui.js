@@ -1,7 +1,7 @@
 import { Stage, thumbnail } from './stage.js';
 import { World } from './world.js';
 import { G, now, cat, myCats, shopCats, tick, care, sell, trade, doBreed, checkBreed, breedCost, sourceOf, collectIncome,
-  pendingIncome, skipTime, reset, dexTotals, save, exportSave, importSave, saveError } from './game.js';
+  pendingIncome, skipTime, reset, dexTotals, save, exportSave, importSave, saveError, penStatus, upgradePen } from './game.js';
 import { phenotypeName, gradeLabel, sellPrice, shopBreedPrice, incomePerHour, canBreed, SPECIALS, FANTASY, COSTUMES, COLOR_KO, TYR_KO, isForbiddenPair } from './engine.js';
 import { PERSONALITIES, CARE_ACTIONS, careCooldown, growthRemaining } from './personality.js';
 import { GRADES, GRADE_COLORS, PARAMS } from './params.js';
@@ -11,6 +11,7 @@ import { bindTouchControls } from './touch-controls.js';
 import { sound } from './audio.js';
 import { loadAudioPreferences, saveAudioPreferences } from './preferences.js';
 import { trapDialogFocus, rememberPanelFocus } from './focus.js';
+import {PLACE_NAMES,tabOfZone} from './locations.js';
 
 const $ = (s) => document.querySelector(s);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
@@ -62,11 +63,15 @@ const desc = (c) => (c.special ? `${SPECIALS[c.special]} · ` : '') + (c.fantasy
 const litterSummary = state => state.total ? `🧹 화장실 청소 ${state.total}개 · 우리 안 화장실을 클릭하거나 아래 청소 버튼을 눌러 주세요.` : '✨ 우리 안 화장실이 깨끗해요.';
 
 /* ───── 렌더 ───── */
-export function init() {
+export function init({development=false}={}) {
+  U.development=development;
+  document.querySelector('#top .dev').hidden=!development;
   try { sound.setVolumes(loadAudioPreferences(window.localStorage)); } catch { /* storage access may be unavailable */ }
-  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onCat: (id) => {
+  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onLocation:()=>updateLocationMenus(),onJourney:id=>{
+    $('#journey').hidden=!id;$('#journeyLabel').textContent=id?`${PLACE_NAMES[tabOfZone(id)]}로 이동 중`:' ';
+  }, onCat: (id) => {
     if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
-    else showDetail(id, true);
+    else {const source=sourceOf(id);if(source?.startsWith('npc:')&&!U.world.nearZone(source))navigateTo(source);else showDetail(id, true);}
   }, onFocus: id => { $('#watchingCat').hidden = !id; $('#watchingCat').dataset.id = id ?? ''; $('#watchingLabel').textContent = id ? `${cat(id).name} 관찰 중 · ${U.world.activityOf(id)}` : ''; }, onClean: id => {
     const result = careDaily(id, 'clean');
     if (result.ok) { sound.play('clean'); fx('🧹'); toast(`${cat(id).name}의 화장실을 치웠어요`); render(); }
@@ -75,7 +80,8 @@ export function init() {
   $('#returnCamera').onclick = () => U.world.stopWatching();
   $('#skipBreed').onclick = () => U.stage?.clear();
   U.world.setupNpcs(G.npcs);
-  U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.target = null; });
+  U.world.checkZones();
+  U.clearStick = bindTouchControls($('#touchStick'), (x, y) => { U.world.stick = { x, y }; if (x || y) U.world.cancelJourney(); });
   document.addEventListener('visibilitychange', () => { sound.visibility(document.hidden).catch(() => toast('소리를 다시 켜 주세요')); });
   $('#btnSound').onclick = toggleSound;
   document.addEventListener('click', onClick);
@@ -133,17 +139,43 @@ export function init() {
 
 function handleZone(id) {
   if (U.busy) return;
+  if(!U.world.nearZone(id)){navigateTo(id);return;}
   if (id === 'shop') openPanel('shop');
   else if (id === 'breed') openPanel('breed');
+  else if (id === 'dex') openPanel('dex');
   else if (id.startsWith('npc:')) { U.npc = id.slice(4); openPanel('npc'); }
 }
-function openPanel(tab) { dexComposing = false; clearTimeout(dexSearchTimer); U.clearStick?.(); U.world.keys = {}; U.world.target = null; U.tab = tab; U.open = true; render(); $('#panel .xbtn').focus({preventScroll:true}); }
+function openPanel(tab) {
+  if(!U.world.canOpen(tab)){navigateTo(tab==='npc'?'npc:'+ (U.npc??G.npcs[0].id):tab);return;}
+  if(tab==='npc')U.npc=U.world.zones.find(z=>z.id.startsWith('npc:')&&U.world.nearZone(z.id))?.id.slice(4)??U.npc;
+  dexComposing = false; clearTimeout(dexSearchTimer); U.clearStick?.(); U.world.keys = {}; U.world.cancelJourney(); U.tab = tab; U.open = true; render(); $('#panel .xbtn').focus({preventScroll:true});
+}
 function closePanel() { dexComposing = false; clearTimeout(dexSearchTimer); U.open = false; render(); document.querySelector(`#tabs [data-tab="${U.tab}"]`)?.focus({preventScroll:true}); }
+function updateLocationMenus(){
+  if(!U.world)return;
+  for(const button of document.querySelectorAll('#tabs [data-tab]'))button.hidden=!U.world.canOpen(button.dataset.tab);
+  if(U.open&&U.tab!=='home'&&!U.world.canOpen(U.tab)){U.open=false;render();}
+}
+function navigateTo(id){
+  if(U.busy)return;
+  if(!$('#modal').hidden)closeModal();
+  U.open=false;U.clearStick?.();render();
+  if(U.world.goToZone(id))toast('지도의 장소로 이동해요. 도착하면 메뉴가 열려요');
+  else toast('이곳에서는 길을 찾지 못했어요. 조금 이동한 뒤 다시 시도해 주세요');
+}
+function showMap(){
+  const destinations=[...U.world.zones.filter(z=>!z.id.startsWith('npc:')),U.world.zones.find(z=>z.id==='npc:'+G.npcs[0].id)];
+  openModal(`<h2>🧭 마을 지도</h2><p class="hint">내 고양이는 어디서나 돌볼 수 있어요. 다른 메뉴는 해당 장소에 도착해야 열려요.</p><div class="map-destinations">${destinations.map(z=>`<button class="btn gray" data-act="navigate" data-zone="${z.id}">${PLACE_NAMES[tabOfZone(z.id)]} · ${Math.round(Math.hypot(z.x-U.world.player.position.x,z.z-U.world.player.position.z))}m</button>`).join('')}</div><button class="btn gray" data-act="close">닫기</button>`);
+}
+function showPenLevels(){
+  openModal(`<h2>🌿 우리 확장 계획</h2><p>현재 Lv.${G.penLevel} · 정원 ${penStatus().capacity}마리</p><p class="hint">재화는 시간 수입·새 도감 보상·동물샵 판매로 모아요. 시작 4마리, 첫 정원 6마리. 처음 확장하면 2마리, 그다음부터 3마리씩 늘어요.</p><table><thead><tr><th>레벨</th><th>정원</th><th>이번 확장 비용</th></tr></thead><tbody>${PARAMS.penLevels.map((level,index)=>`<tr ${index+1===G.penLevel?'aria-current="step"':''}><td>Lv.${index+1}${index+1===G.penLevel?' · 현재':''}</td><td>${level.capacity}마리</td><td>${index?level.cost.toLocaleString()+'🐾':'시작 우리'}</td></tr>`).join('')}</tbody></table><p class="hint">초과한 고양이를 자동으로 팔거나 삭제하지 않아요. 초과분을 판매하거나 확장하기 전에는 추가 교배·교환을 쉬어 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);
+}
 
 export function render() {
+  updateLocationMenus();
   backgroundInert(U.busy || !$('#modal').hidden);
   $('#touchStick').hidden = U.open || U.busy || !$('#modal').hidden;
-  document.querySelectorAll('#tabs button').forEach((b) => { const expanded = U.open && b.dataset.tab === U.tab; b.classList.toggle('on', expanded); b.setAttribute('aria-expanded', String(expanded)); b.setAttribute('aria-controls', 'panel'); });
+  document.querySelectorAll('#tabs [data-tab]').forEach((b) => { const expanded = U.open && b.dataset.tab === U.tab; b.classList.toggle('on', expanded); b.setAttribute('aria-expanded', String(expanded)); b.setAttribute('aria-controls', 'panel'); });
   $('#coins').textContent = G.coins.toLocaleString();
   $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
   updateClock();
@@ -161,6 +193,7 @@ export function render() {
   syncWorld();
 }
 function syncWorld() {
+  const pen=penStatus();U.world.syncPen(pen.level,pen.capacity,pen.count);
   const d = [];
   for (const c of myCats()) d.push({ cat: c, pen: 'mine' });
   for (const n of G.npcs) for (const id of n.cats) { const c = cat(id); if (c) d.push({ cat: c, pen: 'npc:' + n.id }); }
@@ -180,9 +213,11 @@ function homeView() {
   const t = now();
   let html = `<h2>🏠 우리집 <small class="hint">고양이 ${cats.length}마리 · 하루 수입 ${Math.round(cats.reduce((s, x) => s + incomePerHour(x) * 24, 0))}</small></h2>`;
   const litter = litterState(cats, t);
+  const pen=penStatus();
+  html+=`<div class="pen-status"><h3>🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리</h3><p>${pen.over?`<strong class="warn-msg">정원 ${pen.over}마리 초과 · 판매 또는 확장 후 추가 교배할 수 있어요.</strong>`:`빈자리 ${pen.capacity-pen.count}마리 · 정원에서 태어난 새끼는 임시 보호해요.`}</p>${pen.next?`<button class="btn sm" data-act="upgradepen" ${G.coins<pen.next.cost?'disabled':''}>우리 확장 · ${pen.next.capacity}마리 (+${pen.next.capacity-pen.capacity}) · ${pen.next.cost}🐾</button>${G.coins<pen.next.cost?`<small> ${pen.next.cost-G.coins}🐾 더 모으면 확장할 수 있어요.</small>`:''}`:'<p>가장 넓은 우리예요.</p>'}${pen.over?'<button class="btn sm gray" data-act="navigate" data-zone="shop">🛍️ 판매하러 동물샵 가기</button>':''}</div>`;
   html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
-  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button><button class="btn sm gray" data-act="audioSettings">🎵 소리 설정</button></div>`;
-  html += '<p class="hint"><a href="lab.html">🧪 유전 실험실 — 부모 유전자 편집 · 대량 교배 통계</a></p>';
+  html += `<div class="row"><button class="btn sm gray" data-act="backup">💾 진행 백업</button><button class="btn sm gray" data-act="restore">📂 백업 불러오기</button><button class="btn sm gray" data-dev="reset">새 게임</button><button class="btn sm gray" data-act="audioSettings">🎵 소리 설정</button></div>`;
+  html += '<div class="row"><button class="btn sm gray" data-act="penlevels">🌿 우리 확장 계획</button><button class="btn sm gray" data-act="mapguide">🧭 장소 안내</button></div><p class="hint">교배는 교배집, 판매는 동물샵, 도감·실험실은 유전 도서관에서 이용해요.</p>';
   if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
   if (c) html += detailBox(c, t);
   html += `<h3>우리 고양이들</h3><div class="grid">` + cats.map((x) => {
@@ -246,6 +281,7 @@ function breedView() {
       <span class="hint">${label}</span>${c ? `<img src="${thumbnail(c, 110)}" alt=""><span>${c.name} ${badge(c)}</span><span class="hint">${srcLabel(c)}</span>` : '<span style="font-size:40px;margin-top:20px">＋</span>'}</button>`;
   let html = `<h2>💞 교배</h2><div class="sub">수컷 1 + 암컷 1. 새끼는 항상 1마리, 신청자(나)가 데려가요. 교배한 고양이는 24시간 쉬어요.</div>
     <div class="row" style="align-items:stretch">${slotHtml('father', f, '아빠(수컷)')}<div style="align-self:center;font-size:28px">💕</div>${slotHtml('mother', m, '엄마(암컷)')}</div>`;
+  if(penStatus().count===penStatus().capacity)html+='<p class="warn-msg">지금 정원이 가득 찼어요. 이번 새끼는 임시 보호하지만, 이후에는 판매하거나 우리를 확장해야 해요.</p>';
   const msg = f && m ? checkBreed(f, m) : '아빠와 엄마를 골라 주세요';
   const cost = f && m ? breedCost(f, m) : 0;
   html += `<div class="${msg ? 'warn-msg' : 'ok-msg'}">${msg ?? '교배할 수 있어요! ' + (cost ? `(샵 비용 ${cost}🐾)` : '(무료)')}</div>
@@ -271,6 +307,7 @@ function srcLabel(c) {
 
 async function runBreed() {
   if (U.busy) return;
+  if(!U.world.canOpen('breed')){navigateTo('breed');return;}
   const B = U.breed;
   const f = cat(B.father), m = cat(B.mother);
   const r = doBreed(B.father, B.mother);
@@ -301,7 +338,7 @@ function render0() { $('#coins').textContent = G.coins.toLocaleString(); }
 function showResult(r) {
   sound.play('birth');
   const k = r.kitten;
-  openModal(`<h2>🎉 새 가족이 태어났어요!</h2>
+  openModal(`<h2>🎉 새 가족이 태어났어요!</h2>${penStatus().over?`<p class="warn-msg">정원을 ${penStatus().over}마리 초과했어요. 새끼는 임시 보호 중이에요. 동물샵에서 판매하거나 우리를 확장해야 추가 교배할 수 있어요.</p>`:''}
     <div class="row" style="align-items:flex-start"><img src="${thumbnail(k, 220)}" style="width:200px;border-radius:20px;background:#fdeccd">
     <div style="flex:1"><div style="font-size:22px">${k.name} ${sexIcon(k)} ${badge(k)}</div>
     <div class="row" style="margin:6px 0">${tags(k)}</div><div class="hint">${desc(k)}</div>
@@ -323,7 +360,7 @@ function dexView() {
   const query = U.dexSearch.trim().toLocaleLowerCase();
   if (query) entries = entries.filter(e => `${e.c.name} ${desc(e.c)} ${gradeLabel(e.c)} ${PERSONALITIES[e.c.personality]?.name ?? '성장 중'}`.toLocaleLowerCase().includes(query));
   const shown = entries.slice(0, U.dexPage * 60);
-  let html = `<h2>📖 도감</h2>
+  let html = `<h2>📖 도감</h2><p><a href="lab.html">🧪 유전 실험실 · 이론 확률과 교배 표본 비교</a></p>
     <div class="box"><div style="font-size:20px">발견 <b>${tot.found}</b>종</div>
     <div class="hint">일반 ${tot.normal}종 · 스페셜 ${tot.special}/4 · 판타지 ${tot.fantasy}/4<br>설계상 가능한 일반 외형은 11,040종 이상 (tests.html에서 실측 검증) · ${nextMs}종 더 발견하면 보너스 ${PARAMS.dexMilestoneReward}🐾</div></div>
     <div class="row" style="margin-bottom:8px"><button class="chip ${U.dexGrade === -1 ? 'on' : ''}" data-act="dexg" data-g="-1">전체</button>`
@@ -359,11 +396,11 @@ function npcView() {
 
 /* ───── 모달 ───── */
 let modalReturnFocus = null, pendingConfirm = null;
-function backgroundInert(value) { for (const selector of ['#top','#tabs','#panel','#world','#watchingCat','#touchStick']) $(selector).inert = value; }
+function backgroundInert(value) { for (const selector of ['#top','#tabs','#panel','#world','#watchingCat','#touchStick','#journey']) $(selector).inert = value; }
 function openModal(html) {
   if ($('#modal').hidden) modalReturnFocus = document.activeElement;
   pendingConfirm = null;
-  U.clearStick?.(); U.world.keys = {}; U.world.target = null; $('#touchStick').hidden = true;
+  U.clearStick?.(); U.world.keys = {}; U.world.cancelJourney(); $('#touchStick').hidden = true;
   const m = $('#modal'); m.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" tabindex="-1">${html}</div>`; m.hidden = false; U.world.enabled = false;
   const dialog = m.querySelector('.dialog'), heading = dialog.querySelector('h2');
   if (heading) { heading.id = 'dialogTitle'; dialog.setAttribute('aria-labelledby',heading.id); }
@@ -447,6 +484,7 @@ function onClick(e) {
   if (dev) {
     const v = dev.dataset.dev;
     if (U.busy) return;
+    if(v!=='reset'&&!U.development)return;
     if (v === '1h') skipTime(3600e3); else if (v === '1d') skipTime(86400e3); else {
       confirmDialog('새 게임 시작', '저장 데이터를 교체하고 새 게임을 시작할까요? 먼저 진행을 백업해 주세요.', () => {
         reset(); U.sel = myCats()[0].id; U.breed = { father: null, mother: null, slot: 'father', src: 'mine' };
@@ -456,13 +494,23 @@ function onClick(e) {
     }
     stageKey = ''; afterTick(); render(); return;
   }
-  const tb = e.target.closest('#tabs button');
+  const tb = e.target.closest('#tabs [data-tab]');
   if (tb) { if (!U.busy && $('#modal').hidden) gotoTab(tb.dataset.tab); return; }
   const el = e.target.closest('[data-act]');
   if (!el) { if (e.target.id === 'modal') closeModal(); return; }
   if (U.busy) return;
   const d = el.dataset, B = U.breed;
   switch (d.act) {
+    case 'penlevels':showPenLevels();break;
+    case 'mapguide': showMap();break;
+    case 'navigate': navigateTo(d.zone);break;
+    case 'canceljourney':U.world.cancelJourney();break;
+    case 'upgradepen':{
+      const pen=penStatus();if(!pen.next)return;
+      confirmDialog('우리 확장',`${pen.next.cost}🐾를 사용해 Lv.${pen.level+1}, 정원 ${pen.next.capacity}마리로 확장할까요?`,()=>{
+        const result=upgradePen(pen.level);toast(result.ok?`🌿 우리 Lv.${result.level}! ${result.capacity}마리를 키울 수 있어요`:result.msg);render();
+      });break;
+    }
     case 'audioSettings': showAudioSettings(); break;
     case 'audioToggle': toggleSound(); break;
     case 'confirm': { const action = pendingConfirm; closeModal(); action?.(); break; }
@@ -489,6 +537,7 @@ function onClick(e) {
     case 'close': closeModal(); break;
     case 'goto': closeModal(); gotoTab(d.tab); break;
     case 'sell': {
+      if(!U.world.canOpen('shop')){navigateTo('shop');return;}
       const c = cat(d.id);
       confirmDialog('고양이 판매', `${c.name}을(를) ${sellPrice(c)}🐾에 판매할까요? (되돌릴 수 없어요)`, () => {
         const p = sell(d.id);
@@ -510,7 +559,7 @@ function onClick(e) {
     case 'dexg': U.dexGrade = d.g === 'S' ? 'S' : +d.g; U.dexPage = 1; render(); break;
     case 'dexmore': U.dexPage++; render(); break;
     case 'trade': e.stopPropagation(); openTrade(d.npc, d.id); break;
-    case 'dotrade': { if (trade(d.my, d.npc, d.id)) { toast('교환 완료! 이웃이 기뻐해요 🎁'); closeModal(); U.sel = d.id; stageKey = ''; render(); } break; }
+    case 'dotrade': { if (!U.world.nearZone('npc:'+d.npc)){closeModal();navigateTo('npc:'+d.npc);return;}if (trade(d.my, d.npc, d.id)) { toast('교환 완료! 이웃이 기뻐해요 🎁'); closeModal(); U.sel = d.id; stageKey = ''; render(); }else toast(penStatus().over?'정원을 초과했어요. 먼저 판매하거나 우리를 확장해 주세요':'지금은 교환할 수 없어요'); break; }
     case 'npcbreed': {
       e.stopPropagation();
       const c = cat(d.id);
@@ -520,6 +569,7 @@ function onClick(e) {
 }
 
 function openTrade(npcId, npcCatId) {
+  if(!U.world.nearZone('npc:'+npcId)){navigateTo('npc:'+npcId);return;}
   const n = G.npcs.find((x) => x.id === npcId), c = cat(npcCatId);
   openModal(`<h2>🎁 ${n.name}와 교환</h2><div class="sub">${c.name}과(와) 바꿀 내 고양이를 고르세요. 이웃은 무조건 수락해요.</div>
     <div class="grid">${myCats().map((m) => card(m, { attr: `data-act="dotrade" data-my="${m.id}" data-npc="${npcId}" data-id="${npcCatId}"`, meta: '이 아이와 교환' })).join('')}</div>
