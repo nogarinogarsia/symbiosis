@@ -385,7 +385,7 @@ try {
     const before=JSON.stringify(game.G);const parents=game.myCats().filter(c=>c.personality!==null);
     assert(game.checkBreed(parents.find(c=>c.sex==='M'),parents.find(c=>c.sex==='F')).includes('정원'),'초과 교배 차단');
     assert(JSON.stringify(game.G)===before,'차단 시 진행 보존');
-    visit('home');assert($('#panel').textContent.includes('정원 1마리 초과'),'초과 안내');click('#btnIncome');
+    visit('home');click('#btnIncome');assert($('#panel').textContent.includes('정원 1마리 초과'),'초과 안내');
     // Low-income random founders may need more than one capped day to afford level three.
     for(let day=0;day<8&&game.G.coins<game.penStatus().next.cost;day++){click('[data-dev="1d"]');click('#btnIncome');}
     click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
