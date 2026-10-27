@@ -98,6 +98,18 @@ try{
       await page.reload();await page.locator('#tabs [data-tab="home"][aria-controls="panel"]').waitFor();await page.locator('#tabs [data-tab="home"]').click();
       await page.locator('.pen-status').filter({hasText:'5/6마리'}).waitFor();
       assert.equal(await page.locator('#top .dev').isVisible(),false);
+      // Import an older overfull household through its persisted save fixture.
+      await page.evaluate(()=>{
+        const data=JSON.parse(localStorage.getItem('catgene-save-v1'));
+        for(const npc of data.npcs){if(data.mine.length>=8)break;data.mine.push(npc.cats.shift());}
+        localStorage.setItem('catgene-save-v1',JSON.stringify(data));
+      });
+      await page.reload();
+      await page.getByRole('heading',{name:'📢 우리 정원 변경 안내'}).waitFor();
+      assert.match(await page.locator('#modal').innerText(),/2마리 초과/);
+      await page.locator('#modal [data-act="close"]').click();
+      await page.locator('#tabs [data-tab="home"]').click();
+      await page.locator('.pen-status').filter({hasText:'8/6마리'}).waitFor();
       assert.deepEqual(errors,[],`${name}: normal play browser errors`);
       console.log(`${name}: normal play, real navigation, birth/care, all-neighbor map, library and reload passed`);
     }finally{

@@ -200,6 +200,7 @@ export function breedCost(a, b) {
 
 export function checkBreed(father, mother) {
   if(penStatus().over)return `우리 정원보다 ${penStatus().over}마리 많아요. 동물샵에서 판매하거나 우리를 확장해 주세요`;
+  if(penStatus().count>=penStatus().capacity)return '우리 정원이 가득 찼어요. 새끼가 지낼 빈자리를 마련한 뒤 교배해 주세요';
   if (!father || !mother || !sourceOf(father.id) || !sourceOf(mother.id)) return '현재 교배할 수 있는 고양이를 골라 주세요';
   const msg = canBreed(father, mother, now());
   if (msg) return msg;
