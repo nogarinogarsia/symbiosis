@@ -69,7 +69,11 @@ export function init({development=false}={}) {
   U.development=development;
   document.querySelector('#top .dev').hidden=!development;
   try { sound.setVolumes(loadAudioPreferences(window.localStorage)); } catch { /* storage access may be unavailable */ }
-  U.world = new World($('#world'), { onZone: (id) => handleZone(id), onLocation:()=>updateLocationMenus(),onJourney:id=>{
+  U.world = new World($('#world'), { onPenAnchor:point=>{
+    const button=$('#worldPenUpgrade');
+    button.hidden=!point.visible||U.open||U.busy||!$('#modal').hidden;
+    button.style.left=point.x+'px';button.style.top=point.y+'px';
+  }, onZone: (id) => handleZone(id), onLocation:()=>updateLocationMenus(),onJourney:id=>{
     $('#journey').hidden=!id;$('#journeyLabel').textContent=id?`${destinationName(id,G.npcs)} · 이동 중`:' ';
   }, onCat: (id) => {
     if (sourceOf(id) === 'mine') { U.sel = id; openPanel('home'); }
@@ -197,6 +201,10 @@ export function render() {
 }
 function syncWorld() {
   const pen=penStatus();U.world.syncPen(pen.level,pen.capacity,pen.count);
+  const upgradeButton=$('#worldPenUpgrade');
+  upgradeButton.textContent=pen.next?`🌿 우리 확장 · ${pen.count}/${pen.capacity}마리\n＋${pen.next.capacity-pen.capacity}마리 · ${pen.next.cost}🐾`:`🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리\n최대 확장 완료`;
+  upgradeButton.setAttribute('aria-label',pen.next?`우리 업그레이드: ${pen.next.cost}재화로 ${pen.next.capacity}마리까지 확장`:'우리 최대 확장 완료');
+  upgradeButton.disabled=!pen.next;
   const d = [];
   for (const c of myCats()) d.push({ cat: c, pen: 'mine' });
   for (const n of G.npcs) for (const id of n.cats) { const c = cat(id); if (c) d.push({ cat: c, pen: 'npc:' + n.id }); }
@@ -516,6 +524,7 @@ function onClick(e) {
     case 'canceljourney':U.world.cancelJourney();break;
     case 'upgradepen':{
       const pen=penStatus();if(!pen.next)return;
+      if(G.coins<pen.next.cost){openModal(`<h2>🌿 우리 확장</h2><p>${pen.next.cost}🐾로 정원을 ${pen.next.capacity}마리까지 늘릴 수 있어요.</p><p>현재 ${G.coins}🐾 · ${pen.next.cost-G.coins}🐾 더 모아 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);break;}
       confirmDialog('우리 확장',`${pen.next.cost}🐾를 사용해 Lv.${pen.level+1}, 정원 ${pen.next.capacity}마리로 확장할까요?`,()=>{
         const result=upgradePen(pen.level);toast(result.ok?`🌿 우리 Lv.${result.level}! ${result.capacity}마리를 키울 수 있어요`:result.msg);render();
       });break;
