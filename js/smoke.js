@@ -328,7 +328,7 @@ try {
     click('#panel [data-act="upgradepen"]');click('#modal [data-act="close"]');
     assert(game.G.coins===before&&game.G.penLevel===level,'확장 취소');
     click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
-    assert(game.G.coins===before-cost&&game.G.penLevel===level+1&&game.penStatus().capacity===8,'확장 확인');
+    assert(game.G.coins===before-cost&&game.G.penLevel===level+1&&game.penStatus().capacity===7,'확장 확인');
     assert(U.world.pens.mine.w>oldPen.w&&oldPen.group.userData.disposed&&U.world.colliders.length===walls,'실제 울타리 확장·이전 자원/충돌체 정리');
     assert(JSON.parse(memory.getItem('catgene-save-v1')).penLevel===2,'우리 레벨 저장');
   });
@@ -366,6 +366,7 @@ try {
     }finally{U.stage.resize=resize;}
   });
   await check('교배 프레임 오류에도 새끼 보존·조작 복구', async () => {
+    visit('shop');click(`#panel [data-act="sell"][data-id="${U.sel}"]`);click('#modal [data-act="confirm"]');
     click('[data-dev="1d"]');visit('breed');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
     const before=game.G.mine.length;click('#panel [data-act="dobreed"]');
@@ -378,7 +379,7 @@ try {
     assert(!$('#top').inert && U.world.enabled,'배경 조작 복귀');
   });
   await check('정원 초과 새끼 보존·추가 교배 차단·확장으로 해소',()=>{
-    assert(game.penStatus().over===1&&game.G.mine.length===9,'9마리 중 정원 8 초과 보호');
+    assert(game.penStatus().over===1&&game.G.mine.length===8,'8마리 중 정원 7 초과 보호');
     const before=JSON.stringify(game.G);const parents=game.myCats().filter(c=>c.personality!==null);
     assert(game.checkBreed(parents.find(c=>c.sex==='M'),parents.find(c=>c.sex==='F')).includes('정원'),'초과 교배 차단');
     assert(JSON.stringify(game.G)===before,'차단 시 진행 보존');
@@ -386,7 +387,7 @@ try {
     // Low-income random founders may need more than one capped day to afford level three.
     for(let day=0;day<8&&game.G.coins<game.penStatus().next.cost;day++){click('[data-dev="1d"]');click('#btnIncome');}
     click('#panel [data-act="upgradepen"]');click('#modal [data-act="confirm"]');
-    assert(game.penStatus().capacity===11&&game.penStatus().over===0&&game.G.mine.length===9,'확장해 모든 고양이 보존');
+    assert(game.penStatus().capacity===9&&game.penStatus().over===0&&game.G.mine.length===8,'확장해 모든 고양이 보존');
   });
   await check('명시적 판매·새 게임 확인 시에만 상태 변경', () => {
     visit('home');

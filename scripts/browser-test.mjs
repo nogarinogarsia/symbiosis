@@ -69,7 +69,7 @@ try{
       assert.equal(await page.locator('#worldPenUpgrade').innerText(),'⬆ 업그레이드');
       await page.locator('#worldPenUpgrade').click();
       await page.locator('#modal h2').filter({hasText:'우리 확장'}).waitFor();
-      assert.match(await page.locator('#modal').innerText(),/40🐾 더/);
+      assert.match(await page.locator('#modal').innerText(),/40냥 더/);
       await page.locator('#modal [data-act="close"]').click();
       for(const tab of ['breed','shop','npc','dex'])assert.equal(await page.locator(`#tabs [data-tab="${tab}"]`).isVisible(),false);
       await page.locator('#tabs [data-tab="home"]').click();

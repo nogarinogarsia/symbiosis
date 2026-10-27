@@ -26,9 +26,9 @@ export const PARAMS = {
   shopRefreshMs: 6 * 3600e3,          // [제안] 6시간마다 새 교배 상대 입고
   startCoins: 200,
   penLevels: [
-    {capacity:6,cost:0}, {capacity:8,cost:240}, {capacity:11,cost:650},
-    {capacity:14,cost:1400}, {capacity:17,cost:2800}, {capacity:20,cost:5200},
-    {capacity:23,cost:9000}, {capacity:26,cost:15000},
+    {capacity:6,cost:0}, {capacity:7,cost:240}, {capacity:9,cost:650},
+    {capacity:11,cost:1400}, {capacity:13,cost:2800}, {capacity:15,cost:5200},
+    {capacity:17,cost:9000}, {capacity:19,cost:15000},
   ],
 };
 
