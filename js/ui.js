@@ -202,8 +202,8 @@ export function render() {
 function syncWorld() {
   const pen=penStatus();U.world.syncPen(pen.level,pen.capacity,pen.count);
   const upgradeButton=$('#worldPenUpgrade');
-  upgradeButton.textContent=pen.next?`🌿 우리 확장 · ${pen.count}/${pen.capacity}마리\n＋${pen.next.capacity-pen.capacity}마리 · ${pen.next.cost}🐾`:`🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리\n최대 확장 완료`;
-  upgradeButton.setAttribute('aria-label',pen.next?`우리 업그레이드: ${pen.next.cost}재화로 ${pen.next.capacity}마리까지 확장`:'우리 최대 확장 완료');
+  upgradeButton.textContent=pen.next?'⬆ 업그레이드':'✓ 확장 완료';
+  upgradeButton.setAttribute('aria-label',pen.next?'우리 업그레이드':'우리 최대 확장 완료');
   upgradeButton.disabled=!pen.next;
   const d = [];
   for (const c of myCats()) d.push({ cat: c, pen: 'mine' });

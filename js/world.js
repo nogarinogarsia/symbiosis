@@ -199,7 +199,7 @@ export class World {
     if(this.penSignKey===key)return;
     const pen=this.pens.mine;
     if(this.penSign){pen.group.remove(this.penSign);pen.group.userData.ownedTextures.delete(this.penSign.material.map);this.penSign.material.map.dispose();this.penSign.material.dispose();}
-    this.penSign=label(`Lv.${level} · ${count}/${capacity}마리`,{scale:.8,bg:count>capacity?'#ffe1d3':'#fffaf0'});
+    this.penSign=label('우리집',{scale:.8});
     this.penSign.position.set(pen.cx-3,2,pen.gate.z+.1);pen.group.add(this.penSign);pen.group.userData.ownedTextures.add(this.penSign.material.map);this.penSignKey=key;
   }
   buildLitterTray() {
