@@ -148,7 +148,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #397f84;outline-offse
 }
 @media(prefers-reduced-motion:reduce){.fx,.toast,.dialog{animation:none!important}}
 
-#worldPenUpgrade{position:fixed;z-index:5;transform:translate(-50%,-100%);white-space:pre-line;background:#fff8dc;color:#334b24;border:3px solid #73a94e;border-radius:16px;padding:9px 13px;font:inherit;font-size:14px;line-height:1.5;box-shadow:0 4px 12px #30472344;cursor:pointer;min-height:48px}
+#worldPenUpgrade{position:fixed;z-index:5;transform:translate(-50%,-100%);width:max-content;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;background:#fff8dc;color:#334b24;border:3px solid #73a94e;border-radius:16px;padding:9px 13px;font:inherit;font-size:14px;line-height:1.5;box-shadow:0 4px 12px #30472344;cursor:pointer;min-height:48px}
 #worldPenUpgrade::after{content:"";position:absolute;left:calc(50% - 8px);bottom:-11px;border-left:8px solid transparent;border-right:8px solid transparent;border-top:9px solid #73a94e}
 #worldPenUpgrade:focus-visible{outline:3px solid #263f91;outline-offset:3px}
 #worldPenUpgrade:disabled{cursor:default}
