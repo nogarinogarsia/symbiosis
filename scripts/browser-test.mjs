@@ -65,6 +65,12 @@ try{
       await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
       await page.locator('#coins').filter({hasText:'200'}).waitFor();
       assert.equal(await page.locator('#top .dev').isVisible(),false,'Public entry exposed time skips');
+      await page.locator('#worldPenUpgrade').waitFor({state:'visible'});
+      assert.match(await page.locator('#worldPenUpgrade').innerText(),/240/);
+      await page.locator('#worldPenUpgrade').click();
+      await page.locator('#modal h2').filter({hasText:'우리 확장'}).waitFor();
+      assert.match(await page.locator('#modal').innerText(),/40🐾 더/);
+      await page.locator('#modal [data-act="close"]').click();
       for(const tab of ['breed','shop','npc','dex'])assert.equal(await page.locator(`#tabs [data-tab="${tab}"]`).isVisible(),false);
       await page.locator('#tabs [data-tab="home"]').click();
       assert.match(await page.locator('.pen-status').innerText(),/4\/6마리/);

@@ -399,6 +399,10 @@ export class World {
     this.camPos.lerp(new THREE.Vector3(anchor.x, 0, anchor.z), 1 - Math.exp(-dt * 4));
     this.viewDistance = THREE.MathUtils.lerp(this.viewDistance ?? 15.5, followed ? 7.5 : 15.5, 1 - Math.exp(-dt * 4));
     this.placeCamera();
+    const pen=this.pens.mine;
+    const marker=new THREE.Vector3(pen.maxX,2.3,pen.gate.z).project(this.camera);
+    const rect=this.canvas.getBoundingClientRect();
+    this.hooks.onPenAnchor?.({x:rect.left+(marker.x+1)*rect.width/2,y:rect.top+(1-marker.y)*rect.height/2,visible:Math.abs(marker.x)<1&&Math.abs(marker.y)<1&&marker.z>-1&&marker.z<1});
     this.updateCats(dt, t);
     for (const av of this.npcAvatars) { av.userData.inner.position.y = Math.sin(t * 2 + av.position.x) * 0.03; av.userData.head.rotation.z = Math.sin(t * 1.3 + av.position.x) * 0.06; }
     for (const p of this.pulsers) { const s = 1 + Math.sin(t * 3) * 0.12; p.scale.set(s, s, 1); }
