@@ -138,7 +138,7 @@ export function init({development=false}={}) {
     } catch (err) { toast(err.message); }
     finally { e.target.value = ''; }
   });
-  $('#btnIncome').onclick = () => { const n = collectIncome(); if (n > 0) sound.play('income'); toast(n > 0 ? `🐾 ${n} 재화를 받았어요!` : '아직 받을 수입이 없어요'); render(); };
+  $('#btnIncome').onclick = () => { const n = collectIncome(); if (n > 0) sound.play('income'); toast(n > 0 ? `🐾 ${n}냥을 받았어요!` : '아직 받을 수입이 없어요'); render(); };
   if (!U.sel || !cat(U.sel)) U.sel = myCats()[0]?.id ?? null;
   setInterval(everySecond, 1000);
   render();
@@ -175,7 +175,7 @@ function showMap(){
   openModal(`<h2>🧭 마을 지도</h2><p class="hint">아래 목적지를 고르면 실제로 걸어가요. 파란 점은 집사의 현재 위치입니다.</p>${villageMap(U.world.pens,destinations,U.world.player.position,G.npcs)}<div class="map-destinations">${destinations.map(z=>`<button class="btn gray" data-act="navigate" data-zone="${z.id}">${escapeHtml(destinationName(z.id,G.npcs))}<small>${U.world.nearZone(z.id)?'현재 이곳에 있어요':Math.round(Math.hypot(z.x-U.world.player.position.x,z.z-U.world.player.position.z))+'m · 길찾기'}</small></button>`).join('')}</div><button class="btn gray" data-act="close">닫기</button>`);
 }
 function showPenLevels(){
-  openModal(`<h2>🌿 우리 확장 계획</h2><p>현재 Lv.${G.penLevel} · 정원 ${penStatus().capacity}마리</p><p class="hint">재화는 시간 수입·새 도감 보상·동물샵 판매로 모아요. 시작 4마리, 첫 정원 6마리. 처음 확장하면 2마리, 그다음부터 3마리씩 늘어요.</p><table><thead><tr><th>레벨</th><th>정원</th><th>이번 확장 비용</th></tr></thead><tbody>${PARAMS.penLevels.map((level,index)=>`<tr ${index+1===G.penLevel?'aria-current="step"':''}><td>Lv.${index+1}${index+1===G.penLevel?' · 현재':''}</td><td>${level.capacity}마리</td><td>${index?level.cost.toLocaleString()+'🐾':'시작 우리'}</td></tr>`).join('')}</tbody></table><p class="hint">초과한 고양이를 자동으로 팔거나 삭제하지 않아요. 초과분을 판매하거나 확장하기 전에는 추가 교배·교환을 쉬어 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);
+  openModal(`<h2>🌿 우리 확장 계획</h2><p>현재 Lv.${G.penLevel} · 정원 ${penStatus().capacity}마리</p><p class="hint">냥은 시간 수입·새 도감 보상·동물샵 판매로 모아요. 시작 4마리, 첫 정원 6마리. 처음 확장하면 1마리, 그다음부터 2마리씩 늘어요.</p><table><thead><tr><th>레벨</th><th>정원</th><th>이번 확장 비용</th></tr></thead><tbody>${PARAMS.penLevels.map((level,index)=>`<tr ${index+1===G.penLevel?'aria-current="step"':''}><td>Lv.${index+1}${index+1===G.penLevel?' · 현재':''}</td><td>${level.capacity}마리</td><td>${index?level.cost.toLocaleString()+'냥':'시작 우리'}</td></tr>`).join('')}</tbody></table><p class="hint">초과한 고양이를 자동으로 팔거나 삭제하지 않아요. 초과분을 판매하거나 확장하기 전에는 추가 교배·교환을 쉬어 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);
 }
 
 export function render() {
@@ -183,8 +183,8 @@ export function render() {
   backgroundInert(U.busy || !$('#modal').hidden);
   $('#touchStick').hidden = U.open || U.busy || !$('#modal').hidden;
   document.querySelectorAll('#tabs [data-tab]').forEach((b) => { const expanded = U.open && b.dataset.tab === U.tab; b.classList.toggle('on', expanded); b.setAttribute('aria-expanded', String(expanded)); b.setAttribute('aria-controls', 'panel'); });
-  $('#coins').textContent = G.coins.toLocaleString();
-  $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
+  $('#coins').textContent = G.coins.toLocaleString()+'냥';
+  $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString()+'냥';
   updateClock();
   const P = $('#panel');
   if (!U.open) P.hidden = true;
@@ -229,7 +229,7 @@ function homeView() {
   const litter = litterState(cats, t);
   const pen=penStatus();
   const goal=currentGoal(cats);U.goalKey=JSON.stringify(goal);
-  html+=`<div class="pen-status"><h3>🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리</h3><p>${pen.over?`<strong class="warn-msg">정원 ${pen.over}마리 초과 · 판매 또는 확장 후 추가 교배할 수 있어요.</strong>`:`빈자리 ${pen.capacity-pen.count}마리 · 정원에서 태어난 새끼는 임시 보호해요.`}</p>${pen.next?`<button class="btn sm" data-act="upgradepen" ${G.coins<pen.next.cost?'disabled':''}>우리 확장 · ${pen.next.capacity}마리 (+${pen.next.capacity-pen.capacity}) · ${pen.next.cost}🐾</button>${G.coins<pen.next.cost?`<small> ${pen.next.cost-G.coins}🐾 더 모으면 확장할 수 있어요.</small>`:''}`:'<p>가장 넓은 우리예요.</p>'}${pen.over?'<button class="btn sm gray" data-act="navigate" data-zone="shop">🛍️ 판매하러 동물샵 가기</button>':''}</div>`;
+  html+=`<div class="pen-status"><h3>🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리</h3><p>${pen.over?`<strong class="warn-msg">정원 ${pen.over}마리 초과 · 판매 또는 확장 후 추가 교배할 수 있어요.</strong>`:`빈자리 ${pen.capacity-pen.count}마리 · 정원에서 태어난 새끼는 임시 보호해요.`}</p>${pen.next?`<button class="btn sm" data-act="upgradepen" ${G.coins<pen.next.cost?'disabled':''}>우리 확장 · ${pen.next.capacity}마리 (+${pen.next.capacity-pen.capacity}) · ${pen.next.cost}냥</button>${G.coins<pen.next.cost?`<small> ${pen.next.cost-G.coins}냥 더 모으면 확장할 수 있어요.</small>`:''}`:'<p>가장 넓은 우리예요.</p>'}${pen.over?'<button class="btn sm gray" data-act="navigate" data-zone="shop">🛍️ 판매하러 동물샵 가기</button>':''}</div>`;
   html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
   html+=`<div class="next-step"><div><strong>다음 할 일 · ${escapeHtml(goal.title)}</strong><p>${escapeHtml(goal.text)}</p></div><button class="btn sm gray" data-act="${goal.act}" ${goal.zone?`data-zone="${goal.zone}"`:''} ${goal.id?`data-id="${goal.id}"`:''}>${goal.label}</button></div>`;
   if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
@@ -267,8 +267,8 @@ function detailBox(c, t) {
     + `<button class="btn sm" data-act="focuscat" data-id="${c.id}">🔎 월드에서 보기</button>`
     + `<button class="btn sm" data-act="detail" data-id="${c.id}">🧬 유전자·가계도</button>`
     + `<button class="btn sm peach" data-act="gobreed" data-id="${c.id}" ${gr > 0 ? 'disabled' : ''}>💞 교배하기</button>`
-    + `<button class="btn sm gray" data-act="sell" data-id="${c.id}">판매 ${sellPrice(c)}🐾</button></div>`
-    + `<div class="hint" style="margin-top:6px">하루 수입 ${incomePerHour(c) * 24}🐾 · ${gr > 0 ? '성장 후 교배 가능' : cdLeft > 0 ? `교배 쿨다운 <span data-until="${c.lastBreedAt + PARAMS.breedCooldownMs}">${fmt(cdLeft)}</span>` : '교배 가능'}</div>`;
+    + `<button class="btn sm gray" data-act="sell" data-id="${c.id}">판매 ${sellPrice(c)}냥</button></div>`
+    + `<div class="hint" style="margin-top:6px">하루 수입 ${incomePerHour(c) * 24}냥 · ${gr > 0 ? '성장 후 교배 가능' : cdLeft > 0 ? `교배 쿨다운 <span data-until="${c.lastBreedAt + PARAMS.breedCooldownMs}">${fmt(cdLeft)}</span>` : '교배 가능'}</div>`;
   return `<div class="box">${body}</div>`;
 }
 
@@ -299,7 +299,7 @@ function breedView() {
   if(penStatus().count===penStatus().capacity)html+='<p class="warn-msg">지금 정원이 가득 찼어요. 이번 새끼는 임시 보호하지만, 이후에는 판매하거나 우리를 확장해야 해요.</p>';
   const msg = f && m ? checkBreed(f, m) : '아빠와 엄마를 골라 주세요';
   const cost = f && m ? breedCost(f, m) : 0;
-  html += `<div class="${msg ? 'warn-msg' : 'ok-msg'}">${msg ?? '교배할 수 있어요! ' + (cost ? `(샵 비용 ${cost}🐾)` : '(무료)')}</div>
+  html += `<div class="${msg ? 'warn-msg' : 'ok-msg'}">${msg ?? '교배할 수 있어요! ' + (cost ? `(샵 비용 ${cost}냥)` : '(무료)')}</div>
     <div class="row"><button class="btn peach" data-act="dobreed" ${msg ? 'disabled' : ''}>💞 교배하기</button>
     <button class="btn gray sm" data-act="clearbreed">비우기</button></div>`;
   html += `<h3>${B.slot === 'father' ? '아빠' : '엄마'} 고르기</h3><div class="row" style="margin-bottom:8px">`
@@ -307,7 +307,7 @@ function breedView() {
   const list = candidateList(B.slot, B.src);
   html += '<div class="grid">' + list.map(({ c, reason }) => card(c, {
     dis: !!reason, sel: c.id === B[B.slot], attr: `data-act="pick" data-id="${c.id}"`,
-    meta: reason ? `❌ ${reason}` : B.src === 'shop' ? `🐾 ${shopBreedPrice(c)}` : B.src === 'npc' ? '이웃의 고양이' : '',
+    meta: reason ? `❌ ${reason}` : B.src === 'shop' ? `${shopBreedPrice(c)}냥` : B.src === 'npc' ? '이웃의 고양이' : '',
   })).join('') + '</div>';
   if (!list.length) html += '<p class="sub">후보가 없어요.</p>';
   return html;
@@ -315,7 +315,7 @@ function breedView() {
 function srcLabel(c) {
   const s = sourceOf(c.id);
   if (s === 'mine') return '내 고양이';
-  if (s === 'shop') return `동물샵 · ${shopBreedPrice(c)}🐾`;
+  if (s === 'shop') return `동물샵 · ${shopBreedPrice(c)}냥`;
   if (s?.startsWith('npc')) return G.npcs.find((n) => 'npc:' + n.id === s).name + '의 고양이';
   return '';
 }
@@ -348,7 +348,7 @@ async function runBreed() {
   render();
   showResult(r);
 }
-function render0() { $('#coins').textContent = G.coins.toLocaleString(); }
+function render0() { $('#coins').textContent = G.coins.toLocaleString()+'냥'; }
 
 function showResult(r) {
   sound.play('birth');
@@ -358,7 +358,7 @@ function showResult(r) {
     <div style="flex:1"><div style="font-size:22px">${k.name} ${sexIcon(k)} ${badge(k)}</div>
     <div class="row" style="margin:6px 0">${tags(k)}</div><div class="hint">${desc(k)}</div>
     <div class="box" style="margin-top:10px">부: ${r.father.name} · 모: ${r.mother.name}<br>
-    ${r.cost ? `비용 ${r.cost}🐾<br>` : ''}${r.reward ? `📖 새 도감 등록! +${r.reward}🐾` : '이미 도감에 있는 모습이에요'}</div>
+    ${r.cost ? `비용 ${r.cost}냥<br>` : ''}${r.reward ? `📖 새 도감 등록! +${r.reward}냥` : '이미 도감에 있는 모습이에요'}</div>
     <div class="hint">🍼 앞으로 1시간 동안 돌봐 주면 성격이 정해져요.</div></div></div>
     <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-act="goto" data-tab="home">우리집에서 돌보기</button><button class="btn gray" data-act="close">닫기</button></div>`);
 }
@@ -377,7 +377,7 @@ function dexView() {
   const shown = entries.slice(0, U.dexPage * 60);
   let html = `<h2>📖 도감</h2><p><a href="lab.html">🧪 유전 실험실 · 이론 확률과 교배 표본 비교</a></p>
     <div class="box"><div style="font-size:20px">발견 <b>${tot.found}</b>종</div>
-    <div class="hint">일반 ${tot.normal}종 · 스페셜 ${tot.special}/4 · 판타지 ${tot.fantasy}/4<br>설계상 가능한 일반 외형은 11,040종 이상 (tests.html에서 실측 검증) · ${nextMs}종 더 발견하면 보너스 ${PARAMS.dexMilestoneReward}🐾</div></div>
+    <div class="hint">일반 ${tot.normal}종 · 스페셜 ${tot.special}/4 · 판타지 ${tot.fantasy}/4<br>설계상 가능한 일반 외형은 11,040종 이상 (tests.html에서 실측 검증) · ${nextMs}종 더 발견하면 보너스 ${PARAMS.dexMilestoneReward}냥</div></div>
     <div class="row" style="margin-bottom:8px"><button class="chip ${U.dexGrade === -1 ? 'on' : ''}" data-act="dexg" data-g="-1">전체</button>`
     + GRADES.map((g, i) => `<button class="chip ${U.dexGrade === i ? 'on' : ''}" data-act="dexg" data-g="${i}">${g}</button>`).join('')
     + `<button class="chip ${U.dexGrade === 'S' ? 'on' : ''}" data-act="dexg" data-g="S">⭐스페셜·판타지</button></div><div class="grid">`;
@@ -391,10 +391,10 @@ function dexView() {
 /* ───── 동물샵 ───── */
 function shopView() {
   const sc = shopCats();
-  let html = `<h2>🛍️ 동물샵</h2><div class="sub">마음에 드는 고양이와 교배하면 (재화 지불) 그 고양이는 가게에서 사라지고 새 고양이가 들어와요. 새끼는 항상 1마리, 내가 데려가요.</div><p class="hint">다음 입고까지 <span data-until="${G.shopRefreshAt}">${fmt(Math.max(0, G.shopRefreshAt - now()))}</span> · 6시간마다 새 친구가 와요</p><div class="grid">`;
-  html += sc.map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, meta: `🐾 ${shopBreedPrice(c)}${c.carriers ? ` · 🧬${c.carriers}` : ''}` })).join('') + '</div>';
+  let html = `<h2>🛍️ 동물샵</h2><div class="sub">마음에 드는 고양이와 교배하면 (냥 지불) 그 고양이는 가게에서 사라지고 새 고양이가 들어와요. 새끼는 항상 1마리, 내가 데려가요.</div><p class="hint">다음 입고까지 <span data-until="${G.shopRefreshAt}">${fmt(Math.max(0, G.shopRefreshAt - now()))}</span> · 6시간마다 새 친구가 와요</p><div class="grid">`;
+  html += sc.map((c) => card(c, { attr: `data-act="detail" data-id="${c.id}" data-view="1"`, meta: `${shopBreedPrice(c)}냥${c.carriers ? ` · 🧬${c.carriers}` : ''}` })).join('') + '</div>';
   html += `<div class="hint" style="margin-top:6px">🧬 숫자 = 겉으로 안 드러나는 희귀 열성 유전자 보인자 수 (가격에 반영)</div>
-    <h3>우리 고양이 팔기</h3><div class="grid">` + myCats().map((c) => card(c, { attr: `data-act="sell" data-id="${c.id}"`, meta: `팔기 ${sellPrice(c)}🐾` })).join('') + '</div>';
+    <h3>우리 고양이 팔기</h3><div class="grid">` + myCats().map((c) => card(c, { attr: `data-act="sell" data-id="${c.id}"`, meta: `팔기 ${sellPrice(c)}냥` })).join('') + '</div>';
   return html;
 }
 
@@ -524,8 +524,8 @@ function onClick(e) {
     case 'canceljourney':U.world.cancelJourney();break;
     case 'upgradepen':{
       const pen=penStatus();if(!pen.next)return;
-      if(G.coins<pen.next.cost){openModal(`<h2>🌿 우리 확장</h2><p>${pen.next.cost}🐾로 정원을 ${pen.next.capacity}마리까지 늘릴 수 있어요.</p><p>현재 ${G.coins}🐾 · ${pen.next.cost-G.coins}🐾 더 모아 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);break;}
-      confirmDialog('우리 확장',`${pen.next.cost}🐾를 사용해 Lv.${pen.level+1}, 정원 ${pen.next.capacity}마리로 확장할까요?`,()=>{
+      if(G.coins<pen.next.cost){openModal(`<h2>🌿 우리 확장</h2><p>${pen.next.cost}냥로 정원을 ${pen.next.capacity}마리까지 늘릴 수 있어요.</p><p>현재 ${G.coins}냥 · ${pen.next.cost-G.coins}냥 더 모아 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);break;}
+      confirmDialog('우리 확장',`${pen.next.cost}냥를 사용해 Lv.${pen.level+1}, 정원 ${pen.next.capacity}마리로 확장할까요?`,()=>{
         const result=upgradePen(pen.level);toast(result.ok?`🌿 우리 Lv.${result.level}! ${result.capacity}마리를 키울 수 있어요`:result.msg);render();
       });break;
     }
@@ -557,10 +557,10 @@ function onClick(e) {
     case 'sell': {
       if(!U.world.canOpen('shop')){navigateTo('shop');return;}
       const c = cat(d.id);
-      confirmDialog('고양이 판매', `${c.name}을(를) ${sellPrice(c)}🐾에 판매할까요? (되돌릴 수 없어요)`, () => {
+      confirmDialog('고양이 판매', `${c.name}을(를) ${sellPrice(c)}냥에 판매할까요? (되돌릴 수 없어요)`, () => {
         const p = sell(d.id);
         if (p === null) { toast('지금은 판매할 수 없는 고양이예요'); return; }
-        toast(`🐾 ${p}에 판매했어요`);
+        toast(`🐾 ${p}냥에 판매했어요`);
         if (U.sel === d.id) U.sel = myCats()[0]?.id ?? null;
         if (B.father === d.id) B.father = null; if (B.mother === d.id) B.mother = null;
         stageKey = ''; render();
@@ -605,7 +605,7 @@ function everySecond() {
   const shopRefreshAt = G.shopRefreshAt;
   const changed = afterTick();
   updateClock();
-  $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString();
+  $('#incomeAmt').textContent = '+' + pendingIncome().toLocaleString()+'냥';
   const t = now();
   const litter = litterState(myCats(), t);
   U.world.syncLitter(litter);

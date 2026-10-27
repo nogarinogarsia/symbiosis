@@ -93,7 +93,7 @@ export function upgradePen(expectedLevel=G.penLevel) {
   const status=penStatus();
   if(expectedLevel!==G.penLevel)return {ok:false,msg:'우리 레벨이 바뀌었어요. 다시 확인해 주세요'};
   if(!status.next)return {ok:false,msg:'이미 가장 넓은 우리예요'};
-  if(G.coins<status.next.cost)return {ok:false,msg:`재화가 부족해요 (필요 ${status.next.cost}, 부족 ${status.next.cost-G.coins})`};
+  if(G.coins<status.next.cost)return {ok:false,msg:`냥이 부족해요 (필요 ${status.next.cost}냥, 부족 ${status.next.cost-G.coins}냥)`};
   G.coins-=status.next.cost;G.penLevel++;save();
   return {ok:true,...penStatus(),cost:status.next.cost};
 }
@@ -208,7 +208,7 @@ export function checkBreed(father, mother) {
   const shopCount = [father, mother].filter((c) => sourceOf(c.id) === 'shop').length;
   if (shopCount === 2) return '샵 고양이끼리는 교배할 수 없어요';
   const cost = breedCost(father, mother);
-  if (cost > G.coins) return `재화가 부족해요 (필요 ${cost})`;
+  if (cost > G.coins) return `냥이 부족해요 (필요 ${cost}냥)`;
   return null;
 }
 

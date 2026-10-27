@@ -1,12 +1,12 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {nextStep} from '../js/next-step.js';
 import {destinationName,mapPoint,villageMap} from '../js/village-map.js';
-const initial={pen:{count:4,capacity:6,over:0,next:{capacity:8,cost:240}},coins:200,pending:0,babyId:null,readyToBreed:true};
+const initial={pen:{count:4,capacity:6,over:0,next:{capacity:7,cost:240}},coins:200,pending:0,babyId:null,readyToBreed:true};
 test('guidance resolves overcrowding before recommending more kittens',()=>{
   const full={...initial,pen:{...initial.pen,over:1,count:7},babyId:'baby'};
   assert.equal(nextStep(full).zone,'shop');assert.equal(nextStep({...full,coins:300}).act,'upgradepen');
   assert.equal(nextStep({...full,pen:{...full.pen,next:null}}).zone,'shop');
-  assert.equal(nextStep({...initial,pen:{count:26,capacity:26,over:0,next:null}}).zone,'shop');
+  assert.equal(nextStep({...initial,pen:{count:19,capacity:19,over:0,next:null}}).zone,'shop');
 });
 test('guidance distinguishes available cash, uncollected income, baby care and breeding',()=>{
   assert.equal(nextStep({...initial,coins:240}).act,'upgradepen');

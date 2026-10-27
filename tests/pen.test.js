@@ -4,13 +4,13 @@ import {G,newGame,penStatus,upgradePen,exportSave,importSave,doBreed,skipTime,se
 import {PARAMS} from '../js/params.js';
 globalThis.localStorage={setItem(){},getItem(){return null;},removeItem(){}};
 
-test('first pen starts with room for two babies and every upgrade adds two or three places',()=>{
+test('first pen starts with room for two babies and every upgrade adds one or two places',()=>{
   newGame();assert.equal(penStatus().capacity,6);assert.equal(penStatus().count,4);assert.equal(G.penLevel,1);
-  for(let i=1;i<PARAMS.penLevels.length;i++)assert.ok([2,3].includes(PARAMS.penLevels[i].capacity-PARAMS.penLevels[i-1].capacity));
+  for(let i=1;i<PARAMS.penLevels.length;i++)assert.ok([1,2].includes(PARAMS.penLevels[i].capacity-PARAMS.penLevels[i-1].capacity));
   assert.equal(penStatus().next.cost,240);assert.equal(upgradePen().ok,false);assert.equal(G.coins,200);
 });
 test('upgrades charge exactly once, persist and reject stale confirmations',()=>{
-  newGame();G.coins=1000;const result=upgradePen(1);assert.equal(result.ok,true);assert.equal(G.coins,760);assert.equal(penStatus().capacity,8);
+  newGame();G.coins=1000;const result=upgradePen(1);assert.equal(result.ok,true);assert.equal(G.coins,760);assert.equal(penStatus().capacity,7);
   assert.equal(upgradePen(1).ok,false);assert.equal(G.coins,760);
   const raw=exportSave();G.penLevel=1;importSave(raw);assert.equal(G.penLevel,2);
   G.penLevel=PARAMS.penLevels.length;const before=G.coins;assert.equal(upgradePen().ok,false);assert.equal(G.coins,before);
