@@ -132,7 +132,7 @@ export function init({development=false}={}) {
         try {
           importSave(raw);
           U.sel = myCats()[0]?.id ?? null; U.breed.father = null; U.breed.mother = null;
-          U.world.setupNpcs(G.npcs); render(); toast('진행을 불러왔어요');
+          U.world.setupNpcs(G.npcs); render(); toast('진행을 불러왔어요');showCapacityNotice();
         } catch (error) { toast(error.message); }
       });
     } catch (err) { toast(err.message); }
@@ -142,6 +142,12 @@ export function init({development=false}={}) {
   if (!U.sel || !cat(U.sel)) U.sel = myCats()[0]?.id ?? null;
   setInterval(everySecond, 1000);
   render();
+  showCapacityNotice();
+}
+
+function showCapacityNotice(){
+  const pen=penStatus();if(!pen.over)return;
+  openModal(`<h2>📢 우리 정원 변경 안내</h2><p>현재 고양이 ${pen.count}마리 / 정원 ${pen.capacity}마리로, <strong>${pen.over}마리 초과</strong>했어요.</p><p>기존 고양이는 모두 그대로 보호됩니다. 동물샵에서 초과한 고양이를 판매하거나 우리를 확장해 정리해 주세요.</p><p>새끼가 지낼 빈자리가 생길 때까지 교배할 수 없습니다. 정원과 같은 마릿수일 때도 교배가 제한됩니다.</p><button class="btn" data-act="navigate" data-zone="shop">동물샵에서 정리하기</button><button class="btn gray" data-act="close">확인</button>`);
 }
 
 function handleZone(id) {
@@ -229,7 +235,7 @@ function homeView() {
   const litter = litterState(cats, t);
   const pen=penStatus();
   const goal=currentGoal(cats);U.goalKey=JSON.stringify(goal);
-  html+=`<div class="pen-status"><h3>🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리</h3><p>${pen.over?`<strong class="warn-msg">정원 ${pen.over}마리 초과 · 판매 또는 확장 후 추가 교배할 수 있어요.</strong>`:`빈자리 ${pen.capacity-pen.count}마리 · 정원에서 태어난 새끼는 임시 보호해요.`}</p>${pen.next?`<button class="btn sm" data-act="upgradepen" ${G.coins<pen.next.cost?'disabled':''}>우리 확장 · ${pen.next.capacity}마리 (+${pen.next.capacity-pen.capacity}) · ${pen.next.cost}냥</button>${G.coins<pen.next.cost?`<small> ${pen.next.cost-G.coins}냥 더 모으면 확장할 수 있어요.</small>`:''}`:'<p>가장 넓은 우리예요.</p>'}${pen.over?'<button class="btn sm gray" data-act="navigate" data-zone="shop">🛍️ 판매하러 동물샵 가기</button>':''}</div>`;
+  html+=`<div class="pen-status"><h3>🌿 우리 Lv.${pen.level} · ${pen.count}/${pen.capacity}마리</h3><p>${pen.over?`<strong class="warn-msg">정원 ${pen.over}마리 초과 · 판매 또는 확장 후 추가 교배할 수 있어요.</strong>`:`빈자리 ${pen.capacity-pen.count}마리 · 새끼가 지낼 빈자리가 있어야 교배할 수 있어요.`}</p>${pen.next?`<button class="btn sm" data-act="upgradepen" ${G.coins<pen.next.cost?'disabled':''}>우리 확장 · ${pen.next.capacity}마리 (+${pen.next.capacity-pen.capacity}) · ${pen.next.cost}냥</button>${G.coins<pen.next.cost?`<small> ${pen.next.cost-G.coins}냥 더 모으면 확장할 수 있어요.</small>`:''}`:'<p>가장 넓은 우리예요.</p>'}${pen.over?'<button class="btn sm gray" data-act="navigate" data-zone="shop">🛍️ 판매하러 동물샵 가기</button>':''}</div>`;
   html += `<p class="hint" id="litterStatus">${litterSummary(litter)}</p>`;
   html+=`<div class="next-step"><div><strong>다음 할 일 · ${escapeHtml(goal.title)}</strong><p>${escapeHtml(goal.text)}</p></div><button class="btn sm gray" data-act="${goal.act}" ${goal.zone?`data-zone="${goal.zone}"`:''} ${goal.id?`data-id="${goal.id}"`:''}>${goal.label}</button></div>`;
   if (saveError) html += `<p role="alert" class="warn-msg">${saveError}</p>`;
@@ -296,7 +302,7 @@ function breedView() {
       <span class="hint">${label}</span>${c ? `<img src="${thumbnail(c, 110)}" alt=""><span>${c.name} ${badge(c)}</span><span class="hint">${srcLabel(c)}</span>` : '<span style="font-size:40px;margin-top:20px">＋</span>'}</button>`;
   let html = `<h2>💞 교배</h2><div class="sub">수컷 1 + 암컷 1. 새끼는 항상 1마리, 신청자(나)가 데려가요. 교배한 고양이는 24시간 쉬어요.</div>
     <div class="row" style="align-items:stretch">${slotHtml('father', f, '아빠(수컷)')}<div style="align-self:center;font-size:28px">💕</div>${slotHtml('mother', m, '엄마(암컷)')}</div>`;
-  if(penStatus().count===penStatus().capacity)html+='<p class="warn-msg">지금 정원이 가득 찼어요. 이번 새끼는 임시 보호하지만, 이후에는 판매하거나 우리를 확장해야 해요.</p>';
+  if(penStatus().count===penStatus().capacity)html+='<p class="warn-msg">지금 정원이 가득 찼어요. 판매하거나 우리를 확장해 빈자리를 마련해야 교배할 수 있어요.</p>';
   const msg = f && m ? checkBreed(f, m) : '아빠와 엄마를 골라 주세요';
   const cost = f && m ? breedCost(f, m) : 0;
   html += `<div class="${msg ? 'warn-msg' : 'ok-msg'}">${msg ?? '교배할 수 있어요! ' + (cost ? `(샵 비용 ${cost}냥)` : '(무료)')}</div>
@@ -525,7 +531,7 @@ function onClick(e) {
     case 'upgradepen':{
       const pen=penStatus();if(!pen.next)return;
       if(G.coins<pen.next.cost){openModal(`<h2>🌿 우리 확장</h2><p>${pen.next.cost}냥로 정원을 ${pen.next.capacity}마리까지 늘릴 수 있어요.</p><p>현재 ${G.coins}냥 · ${pen.next.cost-G.coins}냥 더 모아 주세요.</p><button class="btn gray" data-act="close">닫기</button>`);break;}
-      confirmDialog('우리 확장',`${pen.next.cost}냥를 사용해 Lv.${pen.level+1}, 정원 ${pen.next.capacity}마리로 확장할까요?`,()=>{
+      confirmDialog('우리 확장',`${pen.next.cost}냥을 사용해 Lv.${pen.level+1}, 정원 ${pen.next.capacity}마리로 확장할까요?`,()=>{
         const result=upgradePen(pen.level);toast(result.ok?`🌿 우리 Lv.${result.level}! ${result.capacity}마리를 키울 수 있어요`:result.msg);render();
       });break;
     }

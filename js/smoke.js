@@ -354,6 +354,7 @@ try {
     click('#modal [data-act="close"]');
   });
   await check('교배 무대 초기화 오류에도 새끼 보존·초점 격리 해제', async () => {
+    visit('shop');click(`#panel [data-act="sell"][data-id="${U.sel}"]`);click('#modal [data-act="confirm"]');
     click('[data-dev="1d"]');visit('breed');
     click('#panel [data-act="pick"]:not(:disabled)');click('#panel [data-act="pick"]:not(:disabled)');
     const before=game.G.mine.length,resize=U.stage.resize;
@@ -378,8 +379,9 @@ try {
     click('#modal [data-act="close"]');
     assert(!$('#top').inert && U.world.enabled,'배경 조작 복귀');
   });
-  await check('정원 초과 새끼 보존·추가 교배 차단·확장으로 해소',()=>{
-    assert(game.penStatus().over===1&&game.G.mine.length===8,'8마리 중 정원 7 초과 보호');
+  await check('기존 초과 저장 보존·교배 차단·확장으로 해소',()=>{
+    const legacy=JSON.parse(game.exportSave());const donor=legacy.npcs.find(n=>n.cats.length);legacy.mine.push(donor.cats.shift());game.importSave(JSON.stringify(legacy));
+    assert(game.penStatus().over===1&&game.G.mine.length===8,'기존 저장 초과 고양이 보존');
     const before=JSON.stringify(game.G);const parents=game.myCats().filter(c=>c.personality!==null);
     assert(game.checkBreed(parents.find(c=>c.sex==='M'),parents.find(c=>c.sex==='F')).includes('정원'),'초과 교배 차단');
     assert(JSON.stringify(game.G)===before,'차단 시 진행 보존');
