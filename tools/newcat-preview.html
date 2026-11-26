@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>newcat 미리보기</title>
+<style>body{margin:0;background:#cfe8c4}canvas{display:block}#info{position:fixed;left:8px;top:8px;font:13px sans-serif;background:#fff9;padding:4px 8px}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head><body><div id="info">newcat.glb 원본 텍스처 · 드래그로 회전</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0xcfe8c4);
+const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 50); cam.position.set(1.2, 0.8, 1.6);
+const ctl = new OrbitControls(cam, r.domElement); ctl.target.set(0, 0.38, 0); ctl.update();
+s.add(new THREE.HemisphereLight(0xffffff, 0x88aa77, 1.2)); const d = new THREE.DirectionalLight(0xffffff, 1.5); d.position.set(2, 3, 2); s.add(d);
+s.add(new THREE.AxesHelper(0.5));
+const g = await new GLTFLoader().loadAsync('../assets/models/newcat.glb');
+s.add(g.scene);
+const face = await new THREE.TextureLoader().loadAsync('../assets/models/newcat_face_smile.png'); face.flipY = false; face.colorSpace = THREE.SRGBColorSpace;
+g.scene.traverse(o => { if (o.isMesh) {
+  const m = o.material; m.onBeforeCompile = sh => {
+    sh.uniforms.faceMap = { value: face };
+    sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec2 vUv1;\nvoid main() { vUv1 = uv1;');
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform sampler2D faceMap; varying vec2 vUv1;\nvoid main() {')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n vec4 fc = texture2D(faceMap, vUv1); diffuseColor.rgb = mix(diffuseColor.rgb, fc.rgb, fc.a);');
+  };
+  console.log('attrs', Object.keys(o.geometry.attributes));
+} });
+(function loop() { requestAnimationFrame(loop); r.render(s, cam); })();
+</script></body></html>

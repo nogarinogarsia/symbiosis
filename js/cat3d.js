@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { resolveAppearance, FANTASY_PALETTE, mix } from './appearance.js';
 import { partTextures, releasePartTextures, eyeTexture, furAlpha } from './textures.js';
 import { behaviorOf } from './behavior.js';
+import { modelCatReady, buildModelCat } from './model-cat.js';
 
 const INK = 0x4a3330;
 const OUTLINES = false; // 툰 셰이딩은 유지, 테두리는 제거
@@ -65,6 +66,8 @@ export function buildCat(cat, opts = {}) {
   root.userData.textureSet = tex;
   root.userData.ownedTextures = new Set();
   try {
+  // Blender 모델(newcat.glb)이 미리 불러와졌으면 그 모델로, 아니면 아래 코드 고양이로
+  if (modelCatReady() && !opts.procedural) return buildModelCat(cat, app, tex, root, { addCostume, behavior: behaviorOf(cat) });
   const rig = new THREE.Group(); root.add(rig);
 
   const matBody = toon(0xffffff, { map: tex.body });

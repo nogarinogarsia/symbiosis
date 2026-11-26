@@ -1,0 +1,263 @@
+{
+ "_note": "새 마을(키아트 v2) 에셋 규격. height = Blender 높이(m, 기존 에셋과 같은 기준), category = 게임 분류(building×1.0 / nature×0.85 / furniture·prop×0.6, 모두 ×2.4), tris = Meshy 리메시 목표, collider = solid|trunk|none",
+ "red_hip_cottage": {
+  "name": "빨간 기와 오두막",
+  "category": "building",
+  "height": 2.4,
+  "tris": 28000,
+  "collider": "solid"
+ },
+ "red_hip_cottage_2": {
+  "name": "빨간 기와 오두막 2",
+  "category": "building",
+  "height": 2.4,
+  "tris": 28000,
+  "collider": "solid"
+ },
+ "red_timber_cottage": {
+  "name": "빨간 목조 오두막",
+  "category": "building",
+  "height": 2.4,
+  "tris": 28000,
+  "collider": "solid"
+ },
+ "green_hip_cottage": {
+  "name": "초록 기와 오두막",
+  "category": "building",
+  "height": 2.4,
+  "tris": 28000,
+  "collider": "solid"
+ },
+ "green_timber_cottage": {
+  "name": "초록 목조 오두막",
+  "category": "building",
+  "height": 2.4,
+  "tris": 28000,
+  "collider": "solid"
+ },
+ "book_library_hut": {
+  "name": "책 도서관",
+  "category": "building",
+  "height": 2.4,
+  "tris": 28000,
+  "collider": "solid"
+ },
+ "village_notice_board": {
+  "name": "마을 게시판",
+  "category": "building",
+  "height": 1.6,
+  "tris": 12000,
+  "collider": "solid"
+ },
+ "cat_shelter_pavilion": {
+  "name": "고양이 쉼터 정자",
+  "category": "building",
+  "height": 1.65,
+  "tris": 22000,
+  "collider": "solid"
+ },
+ "wooden_windmill": {
+  "name": "나무 풍차",
+  "category": "building",
+  "height": 2.8,
+  "tris": 12000,
+  "collider": "solid"
+ },
+ "apple_tree": {
+  "name": "사과나무",
+  "category": "nature",
+  "height": 2.4,
+  "tris": 10000,
+  "collider": "trunk"
+ },
+ "fir_tree": {
+  "name": "전나무",
+  "category": "nature",
+  "height": 2.4,
+  "tris": 8000,
+  "collider": "trunk"
+ },
+ "plaza_great_tree": {
+  "name": "광장 큰 나무",
+  "category": "nature",
+  "height": 3.1,
+  "tris": 20000,
+  "collider": "solid",
+  "collider_scale": 0.62
+ },
+ "red_flower_bush": {
+  "name": "빨간 꽃덤불",
+  "category": "nature",
+  "height": 0.65,
+  "tris": 5000,
+  "collider": "none"
+ },
+ "white_flower_bush": {
+  "name": "흰 꽃덤불",
+  "category": "nature",
+  "height": 0.65,
+  "tris": 5000,
+  "collider": "none"
+ },
+ "green_round_bush": {
+  "name": "초록 덤불",
+  "category": "nature",
+  "height": 0.65,
+  "tris": 4000,
+  "collider": "none"
+ },
+ "tall_grass_clump": {
+  "name": "키 큰 풀",
+  "category": "nature",
+  "height": 0.55,
+  "tris": 2000,
+  "collider": "none"
+ },
+ "large_boulder": {
+  "name": "큰 바위",
+  "category": "nature",
+  "height": 0.9,
+  "tris": 2500,
+  "collider": "solid"
+ },
+ "small_rock": {
+  "name": "작은 돌",
+  "category": "nature",
+  "height": 0.3,
+  "tris": 800,
+  "collider": "none"
+ },
+ "gray_stepping_stone": {
+  "name": "회색 디딤돌",
+  "category": "nature",
+  "height": 0.08,
+  "tris": 500,
+  "collider": "none"
+ },
+ "wood_picket_fence": {
+  "name": "나무 울타리",
+  "category": "furniture",
+  "height": 0.8,
+  "tris": 3000,
+  "collider": "solid"
+ },
+ "wood_slat_bench": {
+  "name": "나무 벤치",
+  "category": "furniture",
+  "height": 0.85,
+  "tris": 3000,
+  "collider": "solid"
+ },
+ "wood_lantern_post": {
+  "name": "나무 가로등",
+  "category": "furniture",
+  "height": 2.0,
+  "tris": 3000,
+  "collider": "solid"
+ },
+ "cat_statue_pedestal": {
+  "name": "고양이 동상",
+  "category": "furniture",
+  "height": 0.75,
+  "tris": 6000,
+  "collider": "solid"
+ },
+ "flower_planter_box": {
+  "name": "꽃 화분 상자",
+  "category": "furniture",
+  "height": 0.5,
+  "tris": 5000,
+  "collider": "solid"
+ },
+ "flower_pot": {
+  "name": "꽃 화분",
+  "category": "furniture",
+  "height": 0.45,
+  "tris": 3000,
+  "collider": "none"
+ },
+ "cat_scratch_post": {
+  "name": "고양이 스크래처",
+  "category": "furniture",
+  "height": 0.8,
+  "tris": 2500,
+  "collider": "solid"
+ },
+ "cat_cushion_basket": {
+  "name": "고양이 방석 바구니",
+  "category": "furniture",
+  "height": 0.3,
+  "tris": 2500,
+  "collider": "none"
+ },
+ "hollow_log_tunnel": {
+  "name": "통나무 터널",
+  "category": "furniture",
+  "height": 0.55,
+  "tris": 3000,
+  "collider": "solid"
+ },
+ "cat_food_bowl_table": {
+  "name": "고양이 밥상",
+  "category": "furniture",
+  "height": 0.3,
+  "tris": 2000,
+  "collider": "none"
+ },
+ "tree_stump_seat": {
+  "name": "그루터기 의자",
+  "category": "furniture",
+  "height": 0.4,
+  "tris": 1500,
+  "collider": "solid"
+ },
+ "cat_face_signboard": {
+  "name": "고양이 간판",
+  "category": "furniture",
+  "height": 1.1,
+  "tris": 2000,
+  "collider": "solid"
+ },
+ "stone_retaining_wall": {
+  "name": "돌 축대",
+  "category": "furniture",
+  "height": 0.6,
+  "tris": 3000,
+  "collider": "solid"
+ },
+ "stone_wood_steps": {
+  "name": "돌·나무 계단",
+  "category": "furniture",
+  "height": 0.6,
+  "tris": 3000,
+  "collider": "none"
+ },
+ "wooden_barrel": {
+  "name": "나무통",
+  "category": "furniture",
+  "height": 0.6,
+  "tris": 2000,
+  "collider": "solid"
+ },
+ "wooden_crate": {
+  "name": "나무 상자",
+  "category": "furniture",
+  "height": 0.45,
+  "tris": 1000,
+  "collider": "solid"
+ },
+ "rocky_cliff_wall": {
+  "name": "바위 절벽",
+  "category": "furniture",
+  "height": 0.6,
+  "tris": 3500,
+  "collider": "solid"
+ },
+ "stone_curb_border": {
+  "name": "꽃밭 돌 테두리",
+  "category": "furniture",
+  "height": 0.2,
+  "tris": 1500,
+  "collider": "none"
+ }
+}

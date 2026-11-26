@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>고양이 렌더 확인</title>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <style>body{margin:0;background:linear-gradient(#fdf1d8,#f7dcc0);font:13px system-ui;color:#4a3b2a}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;padding:10px}
 .c{background:#fff8;border-radius:14px;padding:4px;text-align:center}.c img{width:100%}
@@ -9,6 +9,8 @@ header{padding:16px;max-width:760px;margin:auto}header p{line-height:1.6}#motion
 <script type="module">
 import { createFounder, refreshCat, phenotypeName, COSTUMES } from './js/engine.js';
 import { Stage, thumbnail } from './js/stage.js';
+import { preloadModelCat } from './js/model-cat.js';
+if (new URLSearchParams(location.search).get('cat') !== 'classic') await preloadModelCat();
 const stage = new Stage(document.getElementById('motionCanvas'));
 document.getElementById('motion').onchange = e => {stage.motion={activity:e.target.value==='walk'?'roam':e.target.value,moving:e.target.value==='walk'};};
 function preview(c){stage.showCat(c);document.getElementById('motionName').textContent=`${c.name} · ${c.special || c.fantasy || c.costume || phenotypeName(c.ph)}`;}

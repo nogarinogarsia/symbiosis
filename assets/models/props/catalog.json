@@ -1,0 +1,951 @@
+{
+ "version": 1,
+ "assets": [
+  {
+   "id": "apple_tree",
+   "name": "사과나무",
+   "category": "nature",
+   "file": "apple_tree.glb",
+   "thumb": null,
+   "size": [
+    2.307,
+    2.166,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.154,
+     0.0,
+     -1.083
+    ],
+    "max": [
+     1.154,
+     2.4,
+     1.083
+    ]
+   },
+   "tris": 10846,
+   "collider": "trunk",
+   "bytes": 963328
+  },
+  {
+   "id": "book_library_hut",
+   "name": "책 도서관",
+   "category": "building",
+   "file": "book_library_hut.glb",
+   "thumb": null,
+   "size": [
+    2.776,
+    2.61,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.388,
+     0.0,
+     -1.305
+    ],
+    "max": [
+     1.388,
+     2.4,
+     1.305
+    ]
+   },
+   "tris": 27827,
+   "collider": "solid",
+   "bytes": 1285212
+  },
+  {
+   "id": "cat_cushion_basket",
+   "name": "고양이 방석 바구니",
+   "category": "furniture",
+   "file": "cat_cushion_basket.glb",
+   "thumb": null,
+   "size": [
+    0.882,
+    0.882,
+    0.3
+   ],
+   "bbox": {
+    "min": [
+     -0.441,
+     0.0,
+     -0.441
+    ],
+    "max": [
+     0.441,
+     0.3,
+     0.441
+    ]
+   },
+   "tris": 2524,
+   "collider": "none",
+   "bytes": 287808
+  },
+  {
+   "id": "cat_face_signboard",
+   "name": "고양이 간판",
+   "category": "furniture",
+   "file": "cat_face_signboard.glb",
+   "thumb": null,
+   "size": [
+    0.544,
+    0.188,
+    1.1
+   ],
+   "bbox": {
+    "min": [
+     -0.272,
+     0.0,
+     -0.094
+    ],
+    "max": [
+     0.272,
+     1.1,
+     0.094
+    ]
+   },
+   "tris": 1994,
+   "collider": "solid",
+   "bytes": 176176
+  },
+  {
+   "id": "cat_food_bowl_table",
+   "name": "고양이 밥상",
+   "category": "furniture",
+   "file": "cat_food_bowl_table.glb",
+   "thumb": null,
+   "size": [
+    0.82,
+    0.414,
+    0.3
+   ],
+   "bbox": {
+    "min": [
+     -0.41,
+     0.0,
+     -0.207
+    ],
+    "max": [
+     0.41,
+     0.3,
+     0.207
+    ]
+   },
+   "tris": 2022,
+   "collider": "none",
+   "bytes": 198896
+  },
+  {
+   "id": "cat_scratch_post",
+   "name": "고양이 스크래처",
+   "category": "furniture",
+   "file": "cat_scratch_post.glb",
+   "thumb": null,
+   "size": [
+    0.527,
+    0.525,
+    0.8
+   ],
+   "bbox": {
+    "min": [
+     -0.264,
+     0.0,
+     -0.262
+    ],
+    "max": [
+     0.264,
+     0.8,
+     0.262
+    ]
+   },
+   "tris": 2459,
+   "collider": "solid",
+   "bytes": 206572
+  },
+  {
+   "id": "cat_shelter_pavilion",
+   "name": "고양이 쉼터 정자",
+   "category": "building",
+   "file": "cat_shelter_pavilion.glb",
+   "thumb": null,
+   "size": [
+    1.926,
+    1.521,
+    1.65
+   ],
+   "bbox": {
+    "min": [
+     -0.963,
+     0.0,
+     -0.76
+    ],
+    "max": [
+     0.963,
+     1.65,
+     0.76
+    ]
+   },
+   "tris": 21885,
+   "collider": "solid",
+   "bytes": 1019312
+  },
+  {
+   "id": "cat_statue_pedestal",
+   "name": "고양이 동상",
+   "category": "furniture",
+   "file": "cat_statue_pedestal.glb",
+   "thumb": null,
+   "size": [
+    0.273,
+    0.276,
+    0.75
+   ],
+   "bbox": {
+    "min": [
+     -0.137,
+     0.0,
+     -0.138
+    ],
+    "max": [
+     0.137,
+     0.75,
+     0.138
+    ]
+   },
+   "tris": 6278,
+   "collider": "solid",
+   "bytes": 342352
+  },
+  {
+   "id": "fir_tree",
+   "name": "전나무",
+   "category": "nature",
+   "file": "fir_tree.glb",
+   "thumb": null,
+   "size": [
+    1.436,
+    1.423,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -0.718,
+     0.0,
+     -0.712
+    ],
+    "max": [
+     0.718,
+     2.4,
+     0.712
+    ]
+   },
+   "tris": 8461,
+   "collider": "trunk",
+   "bytes": 418412
+  },
+  {
+   "id": "flower_planter_box",
+   "name": "꽃 화분 상자",
+   "category": "furniture",
+   "file": "flower_planter_box.glb",
+   "thumb": null,
+   "size": [
+    0.742,
+    0.481,
+    0.5
+   ],
+   "bbox": {
+    "min": [
+     -0.371,
+     0.0,
+     -0.24
+    ],
+    "max": [
+     0.371,
+     0.5,
+     0.24
+    ]
+   },
+   "tris": 4600,
+   "collider": "solid",
+   "bytes": 388508
+  },
+  {
+   "id": "flower_pot",
+   "name": "꽃 화분",
+   "category": "furniture",
+   "file": "flower_pot.glb",
+   "thumb": null,
+   "size": [
+    0.378,
+    0.355,
+    0.45
+   ],
+   "bbox": {
+    "min": [
+     -0.189,
+     0.0,
+     -0.177
+    ],
+    "max": [
+     0.189,
+     0.45,
+     0.177
+    ]
+   },
+   "tris": 3091,
+   "collider": "none",
+   "bytes": 286560
+  },
+  {
+   "id": "gray_stepping_stone",
+   "name": "회색 디딤돌",
+   "category": "nature",
+   "file": "gray_stepping_stone.glb",
+   "thumb": null,
+   "size": [
+    0.518,
+    0.455,
+    0.08
+   ],
+   "bbox": {
+    "min": [
+     -0.259,
+     0.0,
+     -0.228
+    ],
+    "max": [
+     0.259,
+     0.08,
+     0.228
+    ]
+   },
+   "tris": 628,
+   "collider": "none",
+   "bytes": 86120
+  },
+  {
+   "id": "green_hip_cottage",
+   "name": "초록 기와 오두막",
+   "category": "building",
+   "file": "green_hip_cottage.glb",
+   "thumb": null,
+   "size": [
+    2.486,
+    2.384,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.243,
+     0.0,
+     -1.192
+    ],
+    "max": [
+     1.243,
+     2.4,
+     1.192
+    ]
+   },
+   "tris": 27694,
+   "collider": "solid",
+   "bytes": 1077276
+  },
+  {
+   "id": "green_round_bush",
+   "name": "초록 덤불",
+   "category": "nature",
+   "file": "green_round_bush.glb",
+   "thumb": null,
+   "size": [
+    0.823,
+    0.816,
+    0.65
+   ],
+   "bbox": {
+    "min": [
+     -0.412,
+     0.0,
+     -0.408
+    ],
+    "max": [
+     0.412,
+     0.65,
+     0.408
+    ]
+   },
+   "tris": 3329,
+   "collider": "none",
+   "bytes": 344180
+  },
+  {
+   "id": "green_timber_cottage",
+   "name": "초록 목조 오두막",
+   "category": "building",
+   "file": "green_timber_cottage.glb",
+   "thumb": null,
+   "size": [
+    3.052,
+    1.673,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.526,
+     0.0,
+     -0.836
+    ],
+    "max": [
+     1.526,
+     2.4,
+     0.836
+    ]
+   },
+   "tris": 26578,
+   "collider": "solid",
+   "bytes": 1115136
+  },
+  {
+   "id": "hollow_log_tunnel",
+   "name": "통나무 터널",
+   "category": "furniture",
+   "file": "hollow_log_tunnel.glb",
+   "thumb": null,
+   "size": [
+    0.967,
+    0.682,
+    0.55
+   ],
+   "bbox": {
+    "min": [
+     -0.483,
+     0.0,
+     -0.341
+    ],
+    "max": [
+     0.483,
+     0.55,
+     0.341
+    ]
+   },
+   "tris": 3162,
+   "collider": "solid",
+   "bytes": 234208
+  },
+  {
+   "id": "large_boulder",
+   "name": "큰 바위",
+   "category": "nature",
+   "file": "large_boulder.glb",
+   "thumb": null,
+   "size": [
+    1.701,
+    1.623,
+    0.9
+   ],
+   "bbox": {
+    "min": [
+     -0.85,
+     0.0,
+     -0.811
+    ],
+    "max": [
+     0.85,
+     0.9,
+     0.811
+    ]
+   },
+   "tris": 2604,
+   "collider": "solid",
+   "bytes": 166452
+  },
+  {
+   "id": "plaza_great_tree",
+   "name": "광장 큰 나무",
+   "category": "nature",
+   "file": "plaza_great_tree.glb",
+   "thumb": null,
+   "size": [
+    3.411,
+    2.679,
+    3.1
+   ],
+   "bbox": {
+    "min": [
+     -1.705,
+     0.0,
+     -1.34
+    ],
+    "max": [
+     1.705,
+     3.1,
+     1.34
+    ]
+   },
+   "tris": 18682,
+   "collider": "solid",
+   "bytes": 1342964,
+   "collider_scale": 0.62
+  },
+  {
+   "id": "red_flower_bush",
+   "name": "빨간 꽃덤불",
+   "category": "nature",
+   "file": "red_flower_bush.glb",
+   "thumb": null,
+   "size": [
+    0.874,
+    0.878,
+    0.65
+   ],
+   "bbox": {
+    "min": [
+     -0.437,
+     0.0,
+     -0.439
+    ],
+    "max": [
+     0.437,
+     0.65,
+     0.439
+    ]
+   },
+   "tris": 4477,
+   "collider": "none",
+   "bytes": 440828
+  },
+  {
+   "id": "red_hip_cottage",
+   "name": "빨간 기와 오두막",
+   "category": "building",
+   "file": "red_hip_cottage.glb",
+   "thumb": null,
+   "size": [
+    2.385,
+    2.269,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.193,
+     0.0,
+     -1.135
+    ],
+    "max": [
+     1.193,
+     2.4,
+     1.135
+    ]
+   },
+   "tris": 28205,
+   "collider": "solid",
+   "bytes": 1243180
+  },
+  {
+   "id": "red_hip_cottage_2",
+   "name": "빨간 기와 오두막 2",
+   "category": "building",
+   "file": "red_hip_cottage_2.glb",
+   "thumb": null,
+   "size": [
+    2.483,
+    2.307,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.242,
+     0.0,
+     -1.153
+    ],
+    "max": [
+     1.242,
+     2.4,
+     1.153
+    ]
+   },
+   "tris": 27615,
+   "collider": "solid",
+   "bytes": 1144008
+  },
+  {
+   "id": "red_timber_cottage",
+   "name": "빨간 목조 오두막",
+   "category": "building",
+   "file": "red_timber_cottage.glb",
+   "thumb": null,
+   "size": [
+    3.097,
+    1.642,
+    2.4
+   ],
+   "bbox": {
+    "min": [
+     -1.549,
+     0.0,
+     -0.821
+    ],
+    "max": [
+     1.549,
+     2.4,
+     0.821
+    ]
+   },
+   "tris": 25746,
+   "collider": "solid",
+   "bytes": 1048444
+  },
+  {
+   "id": "small_rock",
+   "name": "작은 돌",
+   "category": "nature",
+   "file": "small_rock.glb",
+   "thumb": null,
+   "size": [
+    0.529,
+    0.494,
+    0.3
+   ],
+   "bbox": {
+    "min": [
+     -0.264,
+     0.0,
+     -0.247
+    ],
+    "max": [
+     0.264,
+     0.3,
+     0.247
+    ]
+   },
+   "tris": 838,
+   "collider": "none",
+   "bytes": 83704
+  },
+  {
+   "id": "stone_retaining_wall",
+   "name": "돌 축대",
+   "category": "furniture",
+   "file": "stone_retaining_wall.glb",
+   "thumb": null,
+   "size": [
+    2.406,
+    0.392,
+    0.6
+   ],
+   "bbox": {
+    "min": [
+     -1.203,
+     0.0,
+     -0.196
+    ],
+    "max": [
+     1.203,
+     0.6,
+     0.196
+    ]
+   },
+   "tris": 3158,
+   "collider": "solid",
+   "bytes": 233792
+  },
+  {
+   "id": "stone_wood_steps",
+   "name": "돌·나무 계단",
+   "category": "furniture",
+   "file": "stone_wood_steps.glb",
+   "thumb": null,
+   "size": [
+    1.204,
+    1.37,
+    0.6
+   ],
+   "bbox": {
+    "min": [
+     -0.602,
+     0.0,
+     -0.685
+    ],
+    "max": [
+     0.602,
+     0.6,
+     0.685
+    ]
+   },
+   "tris": 3101,
+   "collider": "none",
+   "bytes": 233292
+  },
+  {
+   "id": "tall_grass_clump",
+   "name": "키 큰 풀",
+   "category": "nature",
+   "file": "tall_grass_clump.glb",
+   "thumb": null,
+   "size": [
+    0.431,
+    0.519,
+    0.55
+   ],
+   "bbox": {
+    "min": [
+     -0.215,
+     0.0,
+     -0.26
+    ],
+    "max": [
+     0.215,
+     0.55,
+     0.26
+    ]
+   },
+   "tris": 1910,
+   "collider": "none",
+   "bytes": 240328
+  },
+  {
+   "id": "tree_stump_seat",
+   "name": "그루터기 의자",
+   "category": "furniture",
+   "file": "tree_stump_seat.glb",
+   "thumb": null,
+   "size": [
+    0.746,
+    0.739,
+    0.4
+   ],
+   "bbox": {
+    "min": [
+     -0.373,
+     0.0,
+     -0.369
+    ],
+    "max": [
+     0.373,
+     0.4,
+     0.369
+    ]
+   },
+   "tris": 1574,
+   "collider": "solid",
+   "bytes": 142796
+  },
+  {
+   "id": "village_notice_board",
+   "name": "마을 게시판",
+   "category": "building",
+   "file": "village_notice_board.glb",
+   "thumb": null,
+   "size": [
+    2.155,
+    0.755,
+    1.6
+   ],
+   "bbox": {
+    "min": [
+     -1.078,
+     0.0,
+     -0.377
+    ],
+    "max": [
+     1.078,
+     1.6,
+     0.377
+    ]
+   },
+   "tris": 12242,
+   "collider": "solid",
+   "bytes": 806852
+  },
+  {
+   "id": "white_flower_bush",
+   "name": "흰 꽃덤불",
+   "category": "nature",
+   "file": "white_flower_bush.glb",
+   "thumb": null,
+   "size": [
+    0.673,
+    0.679,
+    0.65
+   ],
+   "bbox": {
+    "min": [
+     -0.337,
+     0.0,
+     -0.339
+    ],
+    "max": [
+     0.337,
+     0.65,
+     0.339
+    ]
+   },
+   "tris": 4186,
+   "collider": "none",
+   "bytes": 330072
+  },
+  {
+   "id": "wood_lantern_post",
+   "name": "나무 가로등",
+   "category": "furniture",
+   "file": "wood_lantern_post.glb",
+   "thumb": null,
+   "size": [
+    0.936,
+    0.403,
+    2.0
+   ],
+   "bbox": {
+    "min": [
+     -0.468,
+     0.0,
+     -0.202
+    ],
+    "max": [
+     0.468,
+     2.0,
+     0.202
+    ]
+   },
+   "tris": 2889,
+   "collider": "solid",
+   "bytes": 218464
+  },
+  {
+   "id": "wood_picket_fence",
+   "name": "나무 울타리",
+   "category": "furniture",
+   "file": "wood_picket_fence.glb",
+   "thumb": null,
+   "size": [
+    1.842,
+    0.259,
+    0.8
+   ],
+   "bbox": {
+    "min": [
+     -0.921,
+     0.0,
+     -0.13
+    ],
+    "max": [
+     0.921,
+     0.8,
+     0.13
+    ]
+   },
+   "tris": 3106,
+   "collider": "solid",
+   "bytes": 278612
+  },
+  {
+   "id": "wood_slat_bench",
+   "name": "나무 벤치",
+   "category": "furniture",
+   "file": "wood_slat_bench.glb",
+   "thumb": null,
+   "size": [
+    1.464,
+    0.704,
+    0.85
+   ],
+   "bbox": {
+    "min": [
+     -0.732,
+     0.0,
+     -0.352
+    ],
+    "max": [
+     0.732,
+     0.85,
+     0.352
+    ]
+   },
+   "tris": 3031,
+   "collider": "solid",
+   "bytes": 235820
+  },
+  {
+   "id": "wooden_barrel",
+   "name": "나무통",
+   "category": "furniture",
+   "file": "wooden_barrel.glb",
+   "thumb": null,
+   "size": [
+    0.597,
+    0.589,
+    0.6
+   ],
+   "bbox": {
+    "min": [
+     -0.298,
+     0.0,
+     -0.295
+    ],
+    "max": [
+     0.298,
+     0.6,
+     0.295
+    ]
+   },
+   "tris": 1949,
+   "collider": "solid",
+   "bytes": 211976
+  },
+  {
+   "id": "wooden_crate",
+   "name": "나무 상자",
+   "category": "furniture",
+   "file": "wooden_crate.glb",
+   "thumb": null,
+   "size": [
+    0.524,
+    0.517,
+    0.45
+   ],
+   "bbox": {
+    "min": [
+     -0.262,
+     0.0,
+     -0.259
+    ],
+    "max": [
+     0.262,
+     0.45,
+     0.259
+    ]
+   },
+   "tris": 1180,
+   "collider": "solid",
+   "bytes": 170552
+  },
+  {
+   "id": "wooden_windmill",
+   "name": "나무 풍차",
+   "category": "building",
+   "file": "wooden_windmill.glb",
+   "thumb": null,
+   "size": [
+    2.052,
+    1.237,
+    2.8
+   ],
+   "bbox": {
+    "min": [
+     -1.026,
+     0.0,
+     -0.619
+    ],
+    "max": [
+     1.026,
+     2.8,
+     0.619
+    ]
+   },
+   "tris": 11677,
+   "collider": "solid",
+   "bytes": 626684
+  }
+ ]
+}
